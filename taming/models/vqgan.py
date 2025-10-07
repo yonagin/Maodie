@@ -157,7 +157,16 @@ class VQModel(pl.LightningModule):
                     "train/dir_d_loss": d_loss,
                     "train/dir_g_loss": torch.tensor(0.0)  # 判别器训练时生成器损失为0
                 }
-                self.log_dict(dir_losses, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                
+                # 自定义进度条显示 - 原地更新（判别器训练）
+                if self.global_step % 10 == 0:  # 每10步显示一次
+                    # 使用\r实现原地更新
+                    print(f"\rStep {self.global_step:6d} | "
+                          f"D Loss: {d_loss.item():.4f} | "
+                          f"D Real: {d_loss_real.item():.4f} | "
+                          f"D Fake: {d_loss_fake.item():.4f}", end="", flush=True)
+                
+                self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
 
                 return d_loss
                 
@@ -181,7 +190,16 @@ class VQModel(pl.LightningModule):
                     "train/dir_d_loss": torch.tensor(0.0)
                 }
                 log_dict_ae['train/total_loss'] = total_loss
-                self.log_dict(dir_losses, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                
+                # 自定义进度条显示 - 原地更新
+                if self.global_step % 10 == 0:  # 每10步显示一次
+                    # 使用\r实现原地更新
+                    print(f"\rStep {self.global_step:6d} | "
+                          f"AE Loss: {aeloss.item():.4f} | "
+                          f"G Loss: {g_loss.item():.4f} | "
+                          f"Total: {total_loss.item():.4f}", end="", flush=True)
+                
+                self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return total_loss
                 
@@ -190,7 +208,7 @@ class VQModel(pl.LightningModule):
                 if hasattr(self.loss, 'discriminator') and self.loss.discriminator is not None:
                     discloss, log_dict_disc = self.loss(qloss, x, xrec, 1, self.global_step,
                                                         last_layer=self.get_last_layer(), split="train")
-                    self.log("train/discloss", discloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                    self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                     self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                     return discloss
                 else:
@@ -211,7 +229,13 @@ class VQModel(pl.LightningModule):
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-                self.log("train/aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                # 自定义进度条显示 - 原地更新（自编码器训练）
+                if self.global_step % 10 == 0:  # 每10步显示一次
+                    # 使用\r实现原地更新
+                    print(f"\rStep {self.global_step:6d} | "
+                          f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
+
+                self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return aeloss
 
@@ -219,7 +243,14 @@ class VQModel(pl.LightningModule):
                 # discriminator
                 discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
-                self.log("train/discloss", discloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                
+                # 自定义进度条显示 - 原地更新（判别器训练）
+                if self.global_step % 10 == 0:  # 每10步显示一次
+                    # 使用\r实现原地更新
+                    print(f"\rStep {self.global_step:6d} | "
+                          f"Disc Loss: {discloss.item():.4f}", end="", flush=True)
+                
+                self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return discloss
 

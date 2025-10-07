@@ -1,4 +1,4 @@
-import argparse, os, sys, datetime, glob, importlib, time
+import argparse, os, sys, datetime, glob, importlib
 from omegaconf import OmegaConf
 import numpy as np
 from PIL import Image
@@ -324,117 +324,6 @@ class ImageLogger(Callback):
         self.log_img(pl_module, batch, batch_idx, split="val")
 
 
-# 添加自定义Progress Bar回调函数
-class CustomProgressBar(pl.callbacks.Callback):
-    def __init__(self):
-        super().__init__()
-        self.current_epoch = 0
-        self.current_batch = 0
-        self.total_batches = 0
-        self.start_time = None
-        
-    def on_train_epoch_start(self, trainer, pl_module):
-        self.current_epoch = trainer.current_epoch
-        self.current_batch = 0
-        self.total_batches = len(trainer.train_dataloader)
-        self.start_time = time.time()
-        print(f"\nEpoch {self.current_epoch}: Starting training")
-        
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        self.current_batch = batch_idx + 1
-        
-        # 计算进度百分比
-        progress = self.current_batch / self.total_batches * 100
-        
-        # 计算已用时间和预计剩余时间
-        elapsed_time = time.time() - self.start_time
-        if self.current_batch > 0:
-            avg_time_per_batch = elapsed_time / self.current_batch
-            remaining_batches = self.total_batches - self.current_batch
-            remaining_time = avg_time_per_batch * remaining_batches
-        else:
-            remaining_time = 0
-            
-        # 格式化时间显示
-        elapsed_str = self.format_time(elapsed_time)
-        remaining_str = self.format_time(remaining_time)
-        
-        # 获取关键指标
-        metrics = self.get_key_metrics(trainer)
-        
-        # 显示进度条
-        bar_length = 30
-        filled_length = int(bar_length * self.current_batch // self.total_batches)
-        bar = '█' * filled_length + '░' * (bar_length - filled_length)
-        
-        print(f"Epoch {self.current_epoch}: {progress:5.1f}%|{bar}| {self.current_batch}/{self.total_batches} "
-              f"[{elapsed_str}<{remaining_str}, {avg_time_per_batch:.2f}s/it] {metrics}", end='\r')
-        
-    def on_train_epoch_end(self, trainer, pl_module):
-        # 换行结束当前epoch的显示
-        print()
-        
-    def on_validation_epoch_start(self, trainer, pl_module):
-        print(f"Epoch {self.current_epoch}: Starting validation")
-        
-    def on_validation_epoch_end(self, trainer, pl_module):
-        # 获取验证指标
-        val_metrics = self.get_validation_metrics(trainer)
-        if val_metrics:
-            print(f"Epoch {self.current_epoch}: Validation - {val_metrics}")
-        
-    def format_time(self, seconds):
-        if seconds < 60:
-            return f"{seconds:.0f}s"
-        elif seconds < 3600:
-            minutes = seconds // 60
-            seconds = seconds % 60
-            return f"{minutes:.0f}m{seconds:.0f}s"
-        else:
-            hours = seconds // 3600
-            minutes = (seconds % 3600) // 60
-            return f"{hours:.0f}h{minutes:.0f}m"
-            
-    def get_key_metrics(self, trainer):
-        # 获取当前步骤的关键指标
-        metrics = {}
-        
-        # 尝试获取常见的训练指标
-        metric_keys = ['loss', 'aeloss', 'discloss', 'rec_loss', 'g_loss', 'd_loss']
-        
-        for key in metric_keys:
-            # 检查train/前缀的指标
-            train_key = f'train/{key}'
-            if hasattr(trainer, 'callback_metrics') and train_key in trainer.callback_metrics:
-                metrics[key] = trainer.callback_metrics[train_key].item()
-            # 检查没有前缀的指标
-            elif hasattr(trainer, 'callback_metrics') and key in trainer.callback_metrics:
-                metrics[key] = trainer.callback_metrics[key].item()
-                
-        # 格式化指标字符串
-        if metrics:
-            metric_str = ', '.join([f'{k}={v:.3f}' for k, v in metrics.items()])
-            return metric_str
-        else:
-            return ""
-            
-    def get_validation_metrics(self, trainer):
-        # 获取验证指标
-        metrics = {}
-        
-        # 尝试获取常见的验证指标
-        metric_keys = ['val_loss', 'val/rec_loss', 'val/aeloss', 'val/discloss']
-        
-        for key in metric_keys:
-            if hasattr(trainer, 'callback_metrics') and key in trainer.callback_metrics:
-                metrics[key.replace('val/', '')] = trainer.callback_metrics[key].item()
-                
-        # 格式化指标字符串
-        if metrics:
-            metric_str = ', '.join([f'{k}={v:.3f}' for k, v in metrics.items()])
-            return metric_str
-        else:
-            return ""
 
 if __name__ == "__main__":
     # custom parser to specify config files, train, test and debug mode,
@@ -634,17 +523,10 @@ if __name__ == "__main__":
                     #"log_momentum": True
                 }
             },
-            "custom_progress_bar": {
-                "target": "main.CustomProgressBar",
-                "params": {}
-            }
         }
         callbacks_cfg = lightning_config.callbacks or OmegaConf.create()
         callbacks_cfg = OmegaConf.merge(default_callbacks_cfg, callbacks_cfg)
         trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
-
-        # 禁用默认的progress bar
-        trainer_kwargs["enable_progress_bar"] = False
 
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
 
