@@ -229,16 +229,8 @@ class VQModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        
-        # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, qloss, p_fake, info = self(x)
-        else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
+    
+        xrec, qloss, _= self(x)
         
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
                                             last_layer=self.get_last_layer(), split="val")
@@ -305,11 +297,7 @@ class VQModel(pl.LightningModule):
         x = x.to(self.device)
         
         # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, _, _, _ = self(x)
-        else:
-            result = self(x)
-            xrec = result[0]  # 只取第一个值（重建图像）
+        xrec, _, _ = self(x)
         
         if x.shape[1] > 3:
             # colorize with random projection
@@ -348,14 +336,7 @@ class VQSegmentationModel(VQModel):
         x = self.get_input(batch, self.image_key)
         
         # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, qloss, p_fake, info = self(x)
-        else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
+        xrec, qloss,info = self(x)
         
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, split="train")
         self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -364,15 +345,7 @@ class VQSegmentationModel(VQModel):
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
         
-        # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, qloss, p_fake, info = self(x)
-        else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
+        xrec, qloss, info = self(x)
         
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, split="val")
         self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -388,11 +361,7 @@ class VQSegmentationModel(VQModel):
         x = x.to(self.device)
         
         # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, _, _, _ = self(x)
-        else:
-            result = self(x)
-            xrec = result[0]  # 只取第一个值（重建图像）
+        xrec, _, _= self(x)
         if x.shape[1] > 3:
             # colorize with random projection
             assert xrec.shape[1] > 3
@@ -426,14 +395,7 @@ class VQNoDiscModel(VQModel):
         x = self.get_input(batch, self.image_key)
         
         # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, qloss, p_fake, info = self(x)
-        else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
+        xrec, qloss, info = self(x)
         
         # autoencode
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, self.global_step, split="train")
@@ -446,15 +408,7 @@ class VQNoDiscModel(VQModel):
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
         
-        # 根据Maodie模式处理forward方法的返回值
-        if self.enable_maodie:
-            xrec, qloss, p_fake, info = self(x)
-        else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
+        xrec, qloss, info = self(x)
         
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, self.global_step, split="val")
         rec_loss = log_dict_ae["val/rec_loss"]
