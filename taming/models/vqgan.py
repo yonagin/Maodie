@@ -249,7 +249,7 @@ class VQModel(pl.LightningModule):
         if (batch_idx+1) % 100 == 0:
             # 将小数转换为百分比格式
             codebook_usage_percent = codebook_usage * 100
-            print(f"Step {self.global_step}: Codebook Usage = {codebook_usage_percent:.2f}%")
+            print(f"\nStep {self.global_step}: Codebook Usage = {codebook_usage_percent:.2f}%\n")
 
 
     def validation_step(self, batch, batch_idx):
