@@ -160,8 +160,8 @@ class VQModel(pl.LightningModule):
                 
                 # 自定义进度条显示 - 原地更新（判别器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用\r实现原地更新
-                    print(f"\rStep {self.global_step:6d} | "
+                    # 使用ANSI转义序列清除当前行并重新显示
+                    print(f"\r\033[KStep {self.global_step:6d} | "
                           f"D Loss: {d_loss.item():.4f} | "
                           f"D Real: {d_loss_real.item():.4f} | "
                           f"D Fake: {d_loss_fake.item():.4f}", end="", flush=True)
@@ -193,8 +193,8 @@ class VQModel(pl.LightningModule):
                 
                 # 自定义进度条显示 - 原地更新
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用\r实现原地更新
-                    print(f"\rStep {self.global_step:6d} | "
+                    # 使用ANSI转义序列清除当前行并重新显示
+                    print(f"\r\033[KStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {g_loss.item():.4f} | "
                           f"Total: {total_loss.item():.4f}", end="", flush=True)
@@ -231,8 +231,8 @@ class VQModel(pl.LightningModule):
 
                 # 自定义进度条显示 - 原地更新（自编码器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用\r实现原地更新
-                    print(f"\rStep {self.global_step:6d} | "
+                    # 使用ANSI转义序列清除当前行并重新显示
+                    print(f"\r\033[KStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -246,8 +246,8 @@ class VQModel(pl.LightningModule):
                 
                 # 自定义进度条显示 - 原地更新（判别器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用\r实现原地更新
-                    print(f"\rStep {self.global_step:6d} | "
+                    # 使用ANSI转义序列清除当前行并重新显示
+                    print(f"\r\033[KStep {self.global_step:6d} | "
                           f"Disc Loss: {discloss.item():.4f}", end="", flush=True)
                 
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -275,10 +275,17 @@ class VQModel(pl.LightningModule):
         discloss, log_dict_disc = self.loss(qloss, x, xrec, 1, self.global_step,
                                             last_layer=self.get_last_layer(), split="val")
         rec_loss = log_dict_ae["val/rec_loss"]
+        
+        # 验证步骤进度条显示
+        if batch_idx % 10 == 0:  # 每10个batch显示一次
+            print(f"\r\033[KValidation | Batch {batch_idx:4d} | "
+                  f"Rec Loss: {rec_loss.item():.4f} | "
+                  f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
+        
         self.log("val/rec_loss", rec_loss,
-                   prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+                   prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
         self.log("val/aeloss", aeloss,
-                   prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+                   prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
         return self.log_dict
