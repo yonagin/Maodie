@@ -528,6 +528,9 @@ if __name__ == "__main__":
         callbacks_cfg = OmegaConf.merge(default_callbacks_cfg, callbacks_cfg)
         trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
 
+        # 显式禁用Lightning的进度条，使用自定义进度条
+        # PyTorch Lightning 1.0.8使用progress_bar_refresh_rate=0来禁用进度条
+        trainer_kwargs["progress_bar_refresh_rate"] = 0
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
 
         # data
