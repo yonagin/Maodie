@@ -115,8 +115,26 @@ def get_parser(**parser_kwargs):
 
 
 def nondefault_trainer_args(opt):
+    # 修复PyTorch Lightning版本兼容性问题
+    # add_argparse_args在1.5+版本中被移除，手动定义常用参数
     parser = argparse.ArgumentParser()
-    parser = Trainer.add_argparse_args(parser)
+    
+    # 手动添加常用的Trainer参数
+    parser.add_argument('--gpus', type=int, default=None)
+    parser.add_argument('--max_epochs', type=int, default=None)
+    parser.add_argument('--max_steps', type=int, default=None)
+    parser.add_argument('--accelerator', type=str, default=None)
+    parser.add_argument('--devices', type=int, default=None)
+    parser.add_argument('--num_nodes', type=int, default=None)
+    parser.add_argument('--precision', type=int, default=None)
+    parser.add_argument('--logger', type=str, default=None)
+    parser.add_argument('--check_val_every_n_epoch', type=int, default=None)
+    parser.add_argument('--fast_dev_run', type=bool, default=None)
+    parser.add_argument('--accumulate_grad_batches', type=int, default=None)
+    parser.add_argument('--limit_train_batches', type=float, default=None)
+    parser.add_argument('--limit_val_batches', type=float, default=None)
+    parser.add_argument('--limit_test_batches', type=float, default=None)
+    
     args = parser.parse_args([])
     return sorted(k for k in vars(args) if getattr(opt, k) != getattr(args, k))
 
