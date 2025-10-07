@@ -108,11 +108,10 @@ class VQModel(pl.LightningModule):
         samples = dirichlet_dist.sample((batch_size,))
         return samples.to(self.device)
 
-    def forward(self, input):
+    def forward(self, input, return_p=False):
         quant, diff, h, info = self.encode(input)  
         dec = self.decode(quant)
-        # 如果启用Maodie对抗训练，同时计算软分配概率p
-        if self.enable_maodie:
+        if return_p:
             # 计算与码本的距离
             z_flattened = h.view(-1, self.quantize.e_dim)
             distances = torch.cdist(z_flattened, self.quantize.embedding.weight)
@@ -125,30 +124,16 @@ class VQModel(pl.LightningModule):
             p_global = p_soft.mean(dim=(1, 2))
             return dec, diff, p_global, info
         else:
-            return dec, diff ,info
+            return dec, diff , info
         
     def training_step(self, batch, batch_idx, optimizer_idx):
         x = self.get_input(batch, self.image_key)
-        
         # Maodie对抗训练逻辑
         if self.enable_maodie:
-            # 一次性计算所有需要的结果
-            result = self(x)
-            if optimizer_idx in [0, 1]:  # Maodie判别器或生成器训练
-                if len(result) == 4:
-                    xrec, qloss, p_fake, info = result
-                else:
-                    # 如果返回的不是4个值，使用默认值
-                    xrec, qloss = result[:2]  # 只取前两个值
-                    p_fake = None
-                    info = result[2] if len(result) > 2 else None
+            if optimizer_idx in [0, 1]: 
+                xrec, qloss, p_fake, info = self(x, return_p=True)
             else:  # 原始判别器训练
-                if len(result) == 3:
-                    xrec, qloss, info = result
-                else:
-                    # 如果返回的不是3个值，使用默认值
-                    xrec, qloss = result[:2]  # 只取前两个值
-                    info = result[2] if len(result) > 2 else None
+                xrec, qloss, info = self(x)
             # 记录码本使用率和困惑度
             if len(info) >= 4:
                 perplexity, _, _, codebook_usage = info
