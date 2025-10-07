@@ -133,10 +133,22 @@ class VQModel(pl.LightningModule):
         # Maodie对抗训练逻辑
         if self.enable_maodie:
             # 一次性计算所有需要的结果
+            result = self(x)
             if optimizer_idx in [0, 1]:  # Maodie判别器或生成器训练
-                xrec, qloss, p_fake, info = self(x)
+                if len(result) == 4:
+                    xrec, qloss, p_fake, info = result
+                else:
+                    # 如果返回的不是4个值，使用默认值
+                    xrec, qloss = result[:2]  # 只取前两个值
+                    p_fake = None
+                    info = result[2] if len(result) > 2 else None
             else:  # 原始判别器训练
-                xrec, qloss, info = self(x)
+                if len(result) == 3:
+                    xrec, qloss, info = result
+                else:
+                    # 如果返回的不是3个值，使用默认值
+                    xrec, qloss = result[:2]  # 只取前两个值
+                    info = result[2] if len(result) > 2 else None
             # 记录码本使用率和困惑度
             if len(info) >= 4:
                 perplexity, _, _, codebook_usage = info
@@ -198,7 +210,12 @@ class VQModel(pl.LightningModule):
                     # 如果没有原始判别器，返回0损失
                     return torch.tensor(0.0, requires_grad=True, device=self.device)
         else:
-            xrec, qloss, info = self(x)
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+                info = result[2] if len(result) > 2 else None
             
             # 记录码本使用率和困惑度
             if len(info) >= 4:
@@ -384,7 +401,13 @@ class VQSegmentationModel(VQModel):
         log = dict()
         x = self.get_input(batch, self.image_key)
         x = x.to(self.device)
-        xrec, _ = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, _, _, _ = self(x)
+        else:
+            result = self(x)
+            xrec = result[0]  # 只取第一个值（重建图像）
         if x.shape[1] > 3:
             # colorize with random projection
             assert xrec.shape[1] > 3
