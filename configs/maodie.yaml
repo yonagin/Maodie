@@ -39,7 +39,7 @@ data:
     train:
       target: taming.data.custom.CustomTrain
       params:
-        training_images_list_file: traing.txt
+        training_images_list_file: train.txt
         size: 256
     validation:
       target: taming.data.custom.CustomTest
