@@ -27,7 +27,7 @@ model:
       params:
         disc_conditional: False
         disc_in_channels: 3
-        disc_start: 30001
+        disc_start: 10000
         disc_weight: 0.8
         codebook_weight: 1.0
 
