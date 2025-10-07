@@ -134,13 +134,6 @@ class VQModel(pl.LightningModule):
                 xrec, qloss, p_fake, info = self(x, return_p=True)
             else:  # 原始判别器训练
                 xrec, qloss, info = self(x)
-            # 记录码本使用率和困惑度
-            if len(info) >= 4:
-                perplexity, _, _, codebook_usage = info
-                if perplexity is not None:
-                    self.log("train/codebook_perplexity", perplexity, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-                if codebook_usage is not None:
-                    self.log("train/codebook_usage", codebook_usage, prog_bar=False, logger=True, on_step=True, on_epoch=True)
             
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
@@ -155,10 +148,6 @@ class VQModel(pl.LightningModule):
                 d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
                 d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
                 d_loss = d_loss_real + d_loss_fake
-                
-                self.log("train/d_loss", d_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log("train/d_loss_real", d_loss_real, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-                self.log("train/d_loss_fake", d_loss_fake, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return d_loss
                 
             elif optimizer_idx == 1:
@@ -170,17 +159,17 @@ class VQModel(pl.LightningModule):
                 # 计算对抗损失 - 使用之前计算的p_fake，避免重复计算
                 d_fake = self.discriminator(p_fake)
                 # 使用BCEWithLogitsLoss，生成器希望判别器输出接近1
-                adv_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
+                g_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
                 
-                total_loss = aeloss + self.lambda_adv * adv_loss
+                total_loss = aeloss + self.lambda_adv * g_loss
                 
-                log_dict_ae["train/adv_loss"] = adv_loss
+                log_dict_ae["train/g_loss"] = g_loss
                 log_dict_ae["train/total_loss"] = total_loss
                 
                 self.log("train/aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log("train/adv_loss", adv_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                self.log("train/g_loss", g_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
                 self.log("train/total_loss", total_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+                self.log_dict(log_dict_ae, prog_bar=True, logger=True, on_step=True, on_epoch=True)
                 return total_loss
                 
             elif optimizer_idx == 2:
@@ -194,6 +183,12 @@ class VQModel(pl.LightningModule):
                 else:
                     # 如果没有原始判别器，返回0损失
                     return torch.tensor(0.0, requires_grad=True, device=self.device)
+        
+        if self.enable_maodie:
+            self.log("train/aeloss", self.aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+            self.log("train/g_loss", self.g_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+            self.log("train/d_loss", d_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+
         else:
             result = self(x)
             if len(result) == 3:
@@ -201,14 +196,6 @@ class VQModel(pl.LightningModule):
             else:
                 xrec, qloss = result[:2]  # 只取前两个值
                 info = result[2] if len(result) > 2 else None
-            
-            # 记录码本使用率和困惑度
-            if len(info) >= 4:
-                perplexity, _, _, codebook_usage = info
-                if perplexity is not None:
-                    self.log("train/codebook_perplexity", perplexity, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-                if codebook_usage is not None:
-                    self.log("train/codebook_usage", codebook_usage, prog_bar=False, logger=True, on_step=True, on_epoch=True)
             
             if optimizer_idx == 0:
                 # autoencode
@@ -226,6 +213,13 @@ class VQModel(pl.LightningModule):
                 self.log("train/discloss", discloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return discloss
+
+        if len(info) >= 4:
+            perplexity, _, _, codebook_usage = info
+            if perplexity is not None:
+                self.log("train/codebook_perplexity", perplexity, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+            if codebook_usage is not None:
+                self.log("train/codebook_usage", codebook_usage, prog_bar=True, logger=True, on_step=True, on_epoch=True)
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
