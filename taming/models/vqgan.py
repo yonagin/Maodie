@@ -180,7 +180,7 @@ class VQModel(pl.LightningModule):
                     "train/dir_g_loss": g_loss,
                     "train/dir_d_loss": torch.tensor(0.0)
                 }
-                self.log_dict(['train/total_loss']) = total_loss
+                log_dict_ae(['train/total_loss']) = total_loss
                 self.log_dict(dir_losses, prog_bar=True, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return total_loss
