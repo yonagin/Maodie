@@ -65,6 +65,9 @@ class VQModel(pl.LightningModule):
         if self.enable_maodie:
             self.discriminator = DirichletDiscriminator(n_embed)
         
+        # 用于控制codebook_usage打印频率的计数器
+        self.codebook_usage_print_counter = 0
+        
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
         self.image_key = image_key
@@ -148,6 +151,14 @@ class VQModel(pl.LightningModule):
                 d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
                 d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
                 d_loss = d_loss_real + d_loss_fake
+                # 统一记录对抗损失
+                dir_losses = {
+                    'train/aeloss': torch.tensor(0.0),
+                    "train/dir_d_loss": d_loss,
+                    "train/dir_g_loss": torch.tensor(0.0)  # 判别器训练时生成器损失为0
+                }
+                self.log_dict(dir_losses, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+
                 return d_loss
                 
             elif optimizer_idx == 1:
@@ -162,14 +173,16 @@ class VQModel(pl.LightningModule):
                 g_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
                 
                 total_loss = aeloss + self.lambda_adv * g_loss
-                
-                log_dict_ae["train/g_loss"] = g_loss
-                log_dict_ae["train/total_loss"] = total_loss
-                
-                self.log("train/aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log("train/g_loss", g_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log("train/total_loss", total_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-                self.log_dict(log_dict_ae, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+            
+                # 合并显示生成器和判别器损失
+                dir_losses = {
+                    'train/aeloss': aeloss,
+                    "train/dir_g_loss": g_loss,
+                    "train/dir_d_loss": torch.tensor(0.0)
+                }
+                self.log_dict(['train/total_loss']) = total_loss
+                self.log_dict(dir_losses, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+                self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return total_loss
                 
             elif optimizer_idx == 2:
@@ -184,10 +197,6 @@ class VQModel(pl.LightningModule):
                     # 如果没有原始判别器，返回0损失
                     return torch.tensor(0.0, requires_grad=True, device=self.device)
         
-        if self.enable_maodie:
-            self.log("train/aeloss", self.aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log("train/g_loss", self.g_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log("train/d_loss", d_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
 
         else:
             result = self(x)
@@ -214,12 +223,15 @@ class VQModel(pl.LightningModule):
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return discloss
 
-        if len(info) >= 4:
-            perplexity, _, _, codebook_usage = info
-            if perplexity is not None:
-                self.log("train/codebook_perplexity", perplexity, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-            if codebook_usage is not None:
-                self.log("train/codebook_usage", codebook_usage, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+        perplexity, _, _, codebook_usage = info
+        
+        # 每隔100个step打印一次codebook_usage
+        self.codebook_usage_print_counter += 1
+        if self.codebook_usage_print_counter % 100 == 0:
+            # 将小数转换为百分比格式
+            codebook_usage_percent = codebook_usage * 100
+            print(f"Step {self.global_step}: Codebook Usage = {codebook_usage_percent:.2f}%")
+
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
