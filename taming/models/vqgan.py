@@ -65,8 +65,7 @@ class VQModel(pl.LightningModule):
         if self.enable_maodie:
             self.discriminator = DirichletDiscriminator(n_embed)
         
-        # 用于控制codebook_usage打印频率的计数器
-        self.codebook_usage_print_counter = 0
+        self.total_d_loss = 0
         
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
@@ -151,20 +150,13 @@ class VQModel(pl.LightningModule):
                 d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
                 d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
                 d_loss = d_loss_real + d_loss_fake
+                self.total_d_loss += d_loss.item()
                 # 统一记录对抗损失
                 dir_losses = {
                     'train/aeloss': torch.tensor(0.0),
                     "train/dir_d_loss": d_loss,
                     "train/dir_g_loss": torch.tensor(0.0)  # 判别器训练时生成器损失为0
                 }
-                
-                # 自定义进度条显示 - 原地更新（判别器训练）
-                if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"\r\033[KStep {self.global_step:6d} | "
-                          f"D Loss: {d_loss.item():.4f} | "
-                          f"D Real: {d_loss_real.item():.4f} | "
-                          f"D Fake: {d_loss_fake.item():.4f}", end="", flush=True)
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
 
@@ -194,10 +186,10 @@ class VQModel(pl.LightningModule):
                 # 自定义进度条显示 - 原地更新
                 if self.global_step % 10 == 0:  # 每10步显示一次
                     # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"\r\033[KStep {self.global_step:6d} | "
+                    print(f"Step {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {g_loss.item():.4f} | "
-                          f"Total: {total_loss.item():.4f}", end="", flush=True)
+                          f"D Loss: {self.total_d_loss / (batch_idx+1):.4f}", end="", flush=True)
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -231,8 +223,7 @@ class VQModel(pl.LightningModule):
 
                 # 自定义进度条显示 - 原地更新（自编码器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"\r\033[KStep {self.global_step:6d} | "
+                    print(f"Step {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -246,8 +237,7 @@ class VQModel(pl.LightningModule):
                 
                 # 自定义进度条显示 - 原地更新（判别器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"\r\033[KStep {self.global_step:6d} | "
+                    print(f"Step {self.global_step:6d} | "
                           f"Disc Loss: {discloss.item():.4f}", end="", flush=True)
                 
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -255,10 +245,8 @@ class VQModel(pl.LightningModule):
                 return discloss
 
         perplexity, _, _, codebook_usage = info
-        
         # 每隔100个step打印一次codebook_usage
-        self.codebook_usage_print_counter += 1
-        if self.codebook_usage_print_counter % 100 == 0:
+        if (batch_idx+1) % 100 == 0:
             # 将小数转换为百分比格式
             codebook_usage_percent = codebook_usage * 100
             print(f"Step {self.global_step}: Codebook Usage = {codebook_usage_percent:.2f}%")
@@ -278,7 +266,7 @@ class VQModel(pl.LightningModule):
         
         # 验证步骤进度条显示
         if batch_idx % 10 == 0:  # 每10个batch显示一次
-            print(f"\r\033[KValidation | Batch {batch_idx:4d} | "
+            print(f"Validation | Batch {batch_idx:4d} | "
                   f"Rec Loss: {rec_loss.item():.4f} | "
                   f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
         
