@@ -301,7 +301,14 @@ class VQModel(pl.LightningModule):
         log = dict()
         x = self.get_input(batch, self.image_key)
         x = x.to(self.device)
-        xrec, _ = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, _, _, _ = self(x)
+        else:
+            result = self(x)
+            xrec = result[0]  # 只取第一个值（重建图像）
+        
         if x.shape[1] > 3:
             # colorize with random projection
             assert xrec.shape[1] > 3
@@ -337,14 +344,34 @@ class VQSegmentationModel(VQModel):
 
     def training_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, qloss, p_fake, info = self(x)
+        else:
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+        
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, split="train")
         self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
         return aeloss
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, qloss, p_fake, info = self(x)
+        else:
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+        
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, split="val")
         self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
         total_loss = log_dict_ae["val/total_loss"]
@@ -389,7 +416,17 @@ class VQNoDiscModel(VQModel):
 
     def training_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, qloss, p_fake, info = self(x)
+        else:
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+        
         # autoencode
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, self.global_step, split="train")
         output = pl.TrainResult(minimize=aeloss)
@@ -400,7 +437,17 @@ class VQNoDiscModel(VQModel):
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, qloss, p_fake, info = self(x)
+        else:
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+        
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, self.global_step, split="val")
         rec_loss = log_dict_ae["val/rec_loss"]
         output = pl.EvalResult(checkpoint_on=rec_loss)
