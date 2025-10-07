@@ -183,10 +183,10 @@ class VQModel(pl.LightningModule):
                 }
                 log_dict_ae['train/total_loss'] = total_loss
                 
-                # 自定义进度条显示 - 原地更新
-                if self.global_step % 10 == 0:  # 每10步显示一次
+                # 自定义进度条显示 - 只在第二个优化器时打印完整信息
+                if self.global_step % 10 == 0: 
                     # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"Step {self.global_step:6d} | "
+                    print(f"\rStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {g_loss.item():.4f} | "
                           f"D Loss: {self.total_d_loss / (batch_idx+1):.4f}", end="", flush=True)
@@ -221,9 +221,9 @@ class VQModel(pl.LightningModule):
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-                # 自定义进度条显示 - 原地更新（自编码器训练）
-                if self.global_step % 10 == 0:  # 每10步显示一次
-                    print(f"Step {self.global_step:6d} | "
+                # 自定义进度条显示 - 只在自编码器优化器时打印
+                if self.global_step % 10 == 0 and optimizer_idx == 0:  # 每10步显示一次，且只在自编码器优化器时
+                    print(f"\rStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
