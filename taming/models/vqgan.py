@@ -227,7 +227,17 @@ class VQModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss = self(x)
+        
+        # 根据Maodie模式处理forward方法的返回值
+        if self.enable_maodie:
+            xrec, qloss, p_fake, info = self(x)
+        else:
+            result = self(x)
+            if len(result) == 3:
+                xrec, qloss, info = result
+            else:
+                xrec, qloss = result[:2]  # 只取前两个值
+        
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
                                             last_layer=self.get_last_layer(), split="val")
 
