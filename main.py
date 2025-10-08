@@ -426,40 +426,17 @@ if __name__ == "__main__":
         lightning_config = config.pop("lightning", OmegaConf.create())
         # merge trainer cli with config
         trainer_config = lightning_config.get("trainer", OmegaConf.create())
-        
-        # 修复GPU配置：如果命令行指定了--gpu参数，但配置中没有gpus，则添加gpus配置
-        if hasattr(opt, 'gpus') and opt.gpus is not None:
-            trainer_config["gpus"] = opt.gpus
-        elif hasattr(opt, 'gpu') and opt.gpu is not None:
-            # 兼容--gpu参数（单数）
-            trainer_config["gpus"] = opt.gpu
-        
+        # default to ddp
+        trainer_config["distributed_backend"] = "ddp"
+        for k in nondefault_trainer_args(opt):
+            trainer_config[k] = getattr(opt, k)
         if not "gpus" in trainer_config:
+            del trainer_config["distributed_backend"]
             cpu = True
         else:
             gpuinfo = trainer_config["gpus"]
             print(f"Running on GPUs {gpuinfo}")
             cpu = False
-            
-            # 智能选择分布式策略：单GPU使用单GPU训练，多GPU使用DDP
-            if isinstance(gpuinfo, int) and gpuinfo == 1:
-                # 单GPU，不使用分布式训练
-                if "distributed_backend" in trainer_config:
-                    del trainer_config["distributed_backend"]
-                if "strategy" in trainer_config:
-                    del trainer_config["strategy"]
-            elif isinstance(gpuinfo, str) and len(gpuinfo.strip(",").split(',')) == 1:
-                # 单GPU（字符串格式），不使用分布式训练
-                if "distributed_backend" in trainer_config:
-                    del trainer_config["distributed_backend"]
-                if "strategy" in trainer_config:
-                    del trainer_config["strategy"]
-            else:
-                # 多GPU，使用DDP
-                trainer_config["strategy"] = "ddp"
-        
-        for k in nondefault_trainer_args(opt):
-            trainer_config[k] = getattr(opt, k)
         trainer_opt = argparse.Namespace(**trainer_config)
         lightning_config.trainer = trainer_config
 

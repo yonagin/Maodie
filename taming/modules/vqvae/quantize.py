@@ -246,7 +246,6 @@ class VectorQuantizer2(nn.Module):
         
         # 初始化累计统计相关属性
         self.accumulated_min_encodings = None
-        self.accumulated_batch_count = 0
 
     def remap_to_used(self, inds):
         ishape = inds.shape
@@ -272,7 +271,7 @@ class VectorQuantizer2(nn.Module):
         back=torch.gather(used[None,:][inds.shape[0]*[0],:], 1, inds)
         return back.reshape(ishape)
 
-    def forward(self, z, temp=None, rescale_logits=False, return_logits=False):
+    def forward(self, z, batch_idx, temp=None, rescale_logits=False, return_logits=False):
         assert temp is None or temp==1.0, "Only for interface compatible with Gumbel"
         assert rescale_logits==False, "Only for interface compatible with Gumbel"
         assert return_logits==False, "Only for interface compatible with Gumbel"
@@ -293,19 +292,17 @@ class VectorQuantizer2(nn.Module):
         # 初始化
         if self.accumulated_min_encodings is None:
             self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
-            self.accumulated_batch_count = 0
         
         # 累计
         current_batch_encodings = min_encodings.sum(dim=0)
         self.accumulated_min_encodings += current_batch_encodings
-        self.accumulated_batch_count += 1
         
         # 默认值
         perplexity = torch.tensor(0.0, device=z.device)
         codebook_usage = torch.tensor(0.0, device=z.device)
         
         # 达到32次才计算
-        if self.accumulated_batch_count >= 32:
+        if batch_idx % 128 == 0:
             print('fuck')
             total_vectors = self.accumulated_min_encodings.sum()
             e_mean_accumulated = self.accumulated_min_encodings / total_vectors
@@ -315,7 +312,6 @@ class VectorQuantizer2(nn.Module):
             
             # 重置（就地操作）
             self.accumulated_min_encodings.zero_()
-            self.accumulated_batch_count = 0
         
         # compute loss for embedding
         if not self.legacy:
