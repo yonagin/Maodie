@@ -303,7 +303,7 @@ class VectorQuantizer2(nn.Module):
         
         # 达到32次才计算
         if batch_idx:
-            if (batch_idx+1) % 128 == 0:
+            if (batch_idx+1) % 32 == 0:
                 print('fuck')
                 total_vectors = self.accumulated_min_encodings.sum()
                 e_mean_accumulated = self.accumulated_min_encodings / total_vectors

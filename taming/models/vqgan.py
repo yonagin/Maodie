@@ -65,12 +65,6 @@ class VQModel(pl.LightningModule):
         if self.enable_maodie:
             self.discriminator = DirichletDiscriminator(n_embed)
         
-        # 累计统计相关参数
-        self.accumulated_batches = 0
-        self.accumulated_perplexity = 0.0
-        self.accumulated_codebook_usage = 0.0
-        self.accumulation_threshold = 128  # 累计128个批次计算一次
-        
         self.total_d_loss = 0
         self.total_g_loss = 0
         if ckpt_path is not None:
@@ -142,7 +136,7 @@ class VQModel(pl.LightningModule):
                 # Maodie判别器训练（第一个优化器）
                 _, _, p_fake, _ = self(x, return_p=True)
                 self.discriminator.requires_grad_(True)
-                p_real = self.sample_dirichlet_prior(2048)
+                p_real = self.sample_dirichlet_prior(p_fake.shape[0])
                 
                 d_fake = self.discriminator(p_fake.detach())
                 d_real = self.discriminator(p_real)
@@ -268,7 +262,7 @@ class VQModel(pl.LightningModule):
         rec_loss = log_dict_ae["val/rec_loss"]
         
         # 验证步骤进度条显示
-        if batch_idx % 16 == 0:  # 每10个batch显示一次
+        if (batch_idx+1) % 32 == 0:  # 每10个batch显示一次
             print(f"\nValidation | Batch {batch_idx:4d} | "
                   f"Rec Loss: {rec_loss.item():.4f} | "
                   f"AE Loss: {aeloss.item():.4f}",  )
