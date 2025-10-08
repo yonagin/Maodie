@@ -141,7 +141,7 @@ class VQModel(pl.LightningModule):
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
-                p_real = self.sample_dirichlet_prior(1024)
+                p_real = self.sample_dirichlet_prior(2048)
                 
                 d_fake = self.discriminator(p_fake.detach())
                 d_real = self.discriminator(p_real)
@@ -192,7 +192,7 @@ class VQModel(pl.LightningModule):
                           f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
                           f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
-                          f"Codebook Usage: {codebook_usage_percent:.2f}%", end="", )
+                          f"Codebook Usage: {codebook_usage_percent:.2f}%",  )
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -226,7 +226,7 @@ class VQModel(pl.LightningModule):
 
                 if self.global_step % 10 == 0 and optimizer_idx == 0:  
                     print(f"\nStep {self.global_step:6d} | "
-                          f"AE Loss: {aeloss.item():.4f}", end="", )
+                          f"AE Loss: {aeloss.item():.4f}",  )
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -239,7 +239,7 @@ class VQModel(pl.LightningModule):
                 
                 if self.global_step % 10 == 0:  # 每10步显示一次
                     print(f"\nStep {self.global_step:6d} | "
-                          f"Disc Loss: {discloss.item():.4f}", end="", )
+                          f"Disc Loss: {discloss.item():.4f}",  )
                 
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -263,7 +263,7 @@ class VQModel(pl.LightningModule):
         if batch_idx % 10 == 0:  # 每10个batch显示一次
             print(f"\nValidation | Batch {batch_idx:4d} | "
                   f"Rec Loss: {rec_loss.item():.4f} | "
-                  f"AE Loss: {aeloss.item():.4f}", end="", )
+                  f"AE Loss: {aeloss.item():.4f}",  )
         
         self.log("val/rec_loss", rec_loss,
                    prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
