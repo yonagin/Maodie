@@ -136,15 +136,11 @@ class VQModel(pl.LightningModule):
         
     def training_step(self, batch, batch_idx, optimizer_idx):
         x = self.get_input(batch, self.image_key)
-        if self.enable_maodie and optimizer_idx in [0, 1]:
-            xrec, qloss, p_fake, info = self(x, return_p=True)
-        else:
-            xrec, qloss, info = self(x)
-        p_fake = None  # optimizer_idx=2 时不需要
         # Maodie对抗训练逻辑
         if self.enable_maodie:
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
+                _, _, p_fake, _ = self(x, return_p=True)
                 self.discriminator.requires_grad_(True)
                 p_real = self.sample_dirichlet_prior(2048)
                 
@@ -170,6 +166,7 @@ class VQModel(pl.LightningModule):
                 
             elif optimizer_idx == 1:
                 self.discriminator.requires_grad_(False)  # 冻结判别器参数
+                xrec, qloss, p_fake, info = self(x, return_p=True)
                 # 生成器训练（VQ-VAE + 对抗损失，第二个优化器）
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
@@ -196,7 +193,7 @@ class VQModel(pl.LightningModule):
                 codebook_usage_percent = codebook_usage.item() * 100
 
     
-                if batch_idx % 16 == 0:
+                if self.global_step % 16 == 0:
                     print(f"Step {self.global_step:6d} | "
                             f"AE Loss: {aeloss.item():.4f} | "
                             f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
@@ -209,6 +206,7 @@ class VQModel(pl.LightningModule):
                 return total_loss
                 
             elif optimizer_idx == 2:
+                xrec, qloss, info = self(x)
                 # 原始判别器训练（第三个优化器，仅当存在判别器时）
                 if hasattr(self.loss, 'discriminator') and self.loss.discriminator is not None:
                     discloss, log_dict_disc = self.loss(qloss, x, xrec, 1, self.global_step,
@@ -222,6 +220,7 @@ class VQModel(pl.LightningModule):
         
 
         else:
+            xrec, qloss, info = self(x)
             # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
             perplexity, _, _, codebook_usage = info
             codebook_usage_percent = codebook_usage.item() * 100
