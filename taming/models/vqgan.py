@@ -116,7 +116,7 @@ class VQModel(pl.LightningModule):
         samples = dirichlet_dist.sample((batch_size,))
         return samples.to(self.device)
 
-    def forward(self, input, batch_idx, return_p=False):
+    def forward(self, input, batch_idx=None, return_p=False):
         quant, diff, h, info = self.encode(input,batch_idx)  
         dec = self.decode(quant)
         if return_p:

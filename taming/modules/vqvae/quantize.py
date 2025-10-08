@@ -302,16 +302,17 @@ class VectorQuantizer2(nn.Module):
         codebook_usage = torch.tensor(0.0, device=z.device)
         
         # 达到32次才计算
-        if (batch_idx+1) % 128 == 0:
-            print('fuck')
-            total_vectors = self.accumulated_min_encodings.sum()
-            e_mean_accumulated = self.accumulated_min_encodings / total_vectors
-            
-            perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
-            codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
-            
-            # 重置（就地操作）
-            self.accumulated_min_encodings.zero_()
+        if batch_idx:
+            if (batch_idx+1) % 128 == 0:
+                print('fuck')
+                total_vectors = self.accumulated_min_encodings.sum()
+                e_mean_accumulated = self.accumulated_min_encodings / total_vectors
+                
+                perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
+                codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
+                
+                # 重置（就地操作）
+                self.accumulated_min_encodings.zero_()
         
         # compute loss for embedding
         if not self.legacy:
