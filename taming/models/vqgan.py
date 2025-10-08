@@ -136,12 +136,13 @@ class VQModel(pl.LightningModule):
         
     def training_step(self, batch, batch_idx, optimizer_idx):
         x = self.get_input(batch, self.image_key)
+        if self.enable_maodie and optimizer_idx in [0, 1]:
+            xrec, qloss, p_fake, info = self(x, return_p=True)
+        else:
+            xrec, qloss, info = self(x)
+        p_fake = None  # optimizer_idx=2 时不需要
         # Maodie对抗训练逻辑
         if self.enable_maodie:
-            if optimizer_idx in [0, 1]: 
-                xrec, qloss, p_fake, info = self(x, return_p=True)
-            else:  # 原始判别器训练
-                xrec, qloss, info = self(x)
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
@@ -222,13 +223,6 @@ class VQModel(pl.LightningModule):
         
 
         else:
-            result = self(x)
-            if len(result) == 3:
-                xrec, qloss, info = result
-            else:
-                xrec, qloss = result[:2]  # 只取前两个值
-                info = result[2] if len(result) > 2 else None
-            
             # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
             perplexity, _, _, codebook_usage = info
             codebook_usage_percent = codebook_usage.item() * 100
