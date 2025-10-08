@@ -66,6 +66,7 @@ class VQModel(pl.LightningModule):
             self.discriminator = DirichletDiscriminator(n_embed)
         
         self.total_d_loss = 0
+        self.total_g_loss = 0
         
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
@@ -136,7 +137,7 @@ class VQModel(pl.LightningModule):
                 xrec, qloss, p_fake, info = self(x, return_p=True)
             else:  # 原始判别器训练
                 xrec, qloss, info = self(x)
-            
+            perplexity, _, _, codebook_usage = info
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
@@ -172,6 +173,7 @@ class VQModel(pl.LightningModule):
                 d_fake = self.discriminator(p_fake)
                 # 使用BCEWithLogitsLoss，生成器希望判别器输出接近1
                 g_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
+                self.total_g_loss += g_loss.item()
                 
                 total_loss = aeloss + self.lambda_adv * g_loss
             
@@ -182,14 +184,16 @@ class VQModel(pl.LightningModule):
                     "train/dir_d_loss": torch.tensor(0.0)
                 }
                 log_dict_ae['train/total_loss'] = total_loss
-                
+                codebook_usage_percent = codebook_usage * 100
                 # 自定义进度条显示 - 只在第二个优化器时打印完整信息
                 if self.global_step % 10 == 0: 
                     # 使用ANSI转义序列清除当前行并重新显示
                     print(f"\rStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
-                          f"G Loss: {g_loss.item():.4f} | "
-                          f"D Loss: {self.total_d_loss / (batch_idx+1):.4f}", end="", flush=True)
+                          f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
+                          f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
+                          f"Perplexity: {perplexity.item():.4f} | "
+                          f"Codebook Usage: {codebook_usage_percent:.2f}%", end="", flush=True)
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -215,7 +219,7 @@ class VQModel(pl.LightningModule):
             else:
                 xrec, qloss = result[:2]  # 只取前两个值
                 info = result[2] if len(result) > 2 else None
-            
+            perplexity, _, _, codebook_usage = info
             if optimizer_idx == 0:
                 # autoencode
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
@@ -244,12 +248,6 @@ class VQModel(pl.LightningModule):
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return discloss
 
-        perplexity, _, _, codebook_usage = info
-        # 每隔100个step打印一次codebook_usage
-        if (batch_idx+1) % 100 == 0:
-            # 将小数转换为百分比格式
-            codebook_usage_percent = codebook_usage * 100
-            print(f"\nStep {self.global_step}: Codebook Usage = {codebook_usage_percent:.2f}%\n")
 
 
     def validation_step(self, batch, batch_idx):
