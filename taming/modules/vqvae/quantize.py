@@ -271,7 +271,7 @@ class VectorQuantizer2(nn.Module):
         back=torch.gather(used[None,:][inds.shape[0]*[0],:], 1, inds)
         return back.reshape(ishape)
 
-    def forward(self, z, batch_idx, temp=None, rescale_logits=False, return_logits=False):
+    def forward(self, z, batch_idx=None, temp=None, rescale_logits=False, return_logits=False):
         assert temp is None or temp==1.0, "Only for interface compatible with Gumbel"
         assert rescale_logits==False, "Only for interface compatible with Gumbel"
         assert return_logits==False, "Only for interface compatible with Gumbel"
@@ -302,7 +302,7 @@ class VectorQuantizer2(nn.Module):
         codebook_usage = torch.tensor(0.0, device=z.device)
         
         # 达到32次才计算
-        if batch_idx % 32 == 0:
+        if (batch_idx+1) % 128 == 0:
             print('fuck')
             total_vectors = self.accumulated_min_encodings.sum()
             e_mean_accumulated = self.accumulated_min_encodings / total_vectors

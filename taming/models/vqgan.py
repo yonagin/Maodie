@@ -193,7 +193,7 @@ class VQModel(pl.LightningModule):
                 codebook_usage_percent = codebook_usage.item() * 100
 
     
-                if batch_idx % 128 == 0:
+                if (batch_idx+1) % 128 == 0:
                     print(f"Step {self.global_step:6d} | "
                             f"AE Loss: {aeloss.item():.4f} | "
                             f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
