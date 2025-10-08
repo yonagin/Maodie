@@ -245,7 +245,7 @@ class VectorQuantizer2(nn.Module):
         self.sane_index_shape = sane_index_shape
         
         # 初始化累计统计相关属性
-        self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
+        self.accumulated_min_encodings = None
 
     def remap_to_used(self, inds):
         ishape = inds.shape
@@ -289,7 +289,10 @@ class VectorQuantizer2(nn.Module):
         
         # 计算码本使用率和困惑度
         min_encodings = F.one_hot(min_encoding_indices, self.n_e).float()
-            
+        # 初始化
+        if self.accumulated_min_encodings is None:
+            self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
+        
         # 累计
         current_batch_encodings = min_encodings.sum(dim=0)
         self.accumulated_min_encodings += current_batch_encodings
@@ -299,7 +302,7 @@ class VectorQuantizer2(nn.Module):
         codebook_usage = torch.tensor(0.0, device=z.device)
         
         # 达到32次才计算
-        if batch_idx % 128 == 0:
+        if batch_idx % 32 == 0:
             print('fuck')
             total_vectors = self.accumulated_min_encodings.sum()
             e_mean_accumulated = self.accumulated_min_encodings / total_vectors
