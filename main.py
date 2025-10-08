@@ -430,6 +430,14 @@ if __name__ == "__main__":
         trainer_config["distributed_backend"] = "ddp"
         for k in nondefault_trainer_args(opt):
             trainer_config[k] = getattr(opt, k)
+        
+        # 修复GPU配置：如果命令行指定了--gpu参数，但配置中没有gpus，则添加gpus配置
+        if hasattr(opt, 'gpus') and opt.gpus is not None:
+            trainer_config["gpus"] = opt.gpus
+        elif hasattr(opt, 'gpu') and opt.gpu is not None:
+            # 兼容--gpu参数（单数）
+            trainer_config["gpus"] = opt.gpu
+        
         if not "gpus" in trainer_config:
             del trainer_config["distributed_backend"]
             cpu = True
