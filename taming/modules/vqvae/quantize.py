@@ -292,6 +292,14 @@ class VectorQuantizer2(nn.Module):
         min_encodings = F.one_hot(min_encoding_indices, self.n_e).float()
         # 初始化
         if self.accumulated_min_encodings is None:
+            print(f"[VQ INIT] Creating accumulator on device {z.device}")
+            self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
+            self.accumulated_batch_count = 0
+        
+        # 检查设备是否匹配
+        if self.accumulated_min_encodings.device != z.device:
+            print(f"[VQ WARNING] Device mismatch! accumulator on {self.accumulated_min_encodings.device}, z on {z.device}")
+            print(f"[VQ WARNING] Resetting accumulator to device {z.device}")
             self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
             self.accumulated_batch_count = 0
         
@@ -300,22 +308,30 @@ class VectorQuantizer2(nn.Module):
         self.accumulated_min_encodings += current_batch_encodings
         self.accumulated_batch_count += 1
         
+        print(f"[VQ COUNT] accumulated_batch_count = {self.accumulated_batch_count}")
+        
         # 默认值
         perplexity = torch.tensor(0.0, device=z.device)
         codebook_usage = torch.tensor(0.0, device=z.device)
         
-        # 达到32次才计算
+        # 检查是否达到阈值
         if self.accumulated_batch_count >= 32:
+            print(f"[VQ TRIGGER] Computing stats at count={self.accumulated_batch_count}")
             total_vectors = self.accumulated_min_encodings.sum()
-            e_mean_accumulated = self.accumulated_min_encodings / total_vectors
-            
-            perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
-            codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
-            
-            # 重置（就地操作）
+            print(f"[VQ TRIGGER] total_vectors = {total_vectors}")
+        
+            if total_vectors > 0:
+                e_mean_accumulated = self.accumulated_min_encodings / total_vectors
+                
+                perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
+                codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
+                
+                print(f"[VQ TRIGGER] perplexity = {perplexity.item():.4f}, codebook_usage = {codebook_usage.item():.4f}")
+        
+            # 重置
             self.accumulated_min_encodings.zero_()
             self.accumulated_batch_count = 0
-        
+            print(f"[VQ TRIGGER] Reset accumulator")
         # compute loss for embedding
         if not self.legacy:
             loss = self.beta * torch.mean((z_q.detach()-z)**2) + \
