@@ -141,7 +141,7 @@ class VQModel(pl.LightningModule):
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
-                p_real = self.sample_dirichlet_prior(128)
+                p_real = self.sample_dirichlet_prior(1024)
                 
                 d_fake = self.discriminator(p_fake.detach())
                 d_real = self.discriminator(p_real)
@@ -185,15 +185,14 @@ class VQModel(pl.LightningModule):
                 }
                 log_dict_ae['train/total_loss'] = total_loss
                 codebook_usage_percent = codebook_usage * 100
-                # 自定义进度条显示 - 只在第二个优化器时打印完整信息
+    
                 if self.global_step % 10 == 0: 
-                    # 使用ANSI转义序列清除当前行并重新显示
-                    print(f"\rStep {self.global_step:6d} | "
+                    print(f"\nStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
                           f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
-                          f"Codebook Usage: {codebook_usage_percent:.2f}%", end="", flush=True)
+                          f"Codebook Usage: {codebook_usage_percent:.2f}%", end="", )
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -225,10 +224,9 @@ class VQModel(pl.LightningModule):
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-                # 自定义进度条显示 - 只在自编码器优化器时打印
-                if self.global_step % 10 == 0 and optimizer_idx == 0:  # 每10步显示一次，且只在自编码器优化器时
-                    print(f"\rStep {self.global_step:6d} | "
-                          f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
+                if self.global_step % 10 == 0 and optimizer_idx == 0:  
+                    print(f"\nStep {self.global_step:6d} | "
+                          f"AE Loss: {aeloss.item():.4f}", end="", )
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -239,10 +237,9 @@ class VQModel(pl.LightningModule):
                 discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
                 
-                # 自定义进度条显示 - 原地更新（判别器训练）
                 if self.global_step % 10 == 0:  # 每10步显示一次
-                    print(f"Step {self.global_step:6d} | "
-                          f"Disc Loss: {discloss.item():.4f}", end="", flush=True)
+                    print(f"\nStep {self.global_step:6d} | "
+                          f"Disc Loss: {discloss.item():.4f}", end="", )
                 
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -264,9 +261,9 @@ class VQModel(pl.LightningModule):
         
         # 验证步骤进度条显示
         if batch_idx % 10 == 0:  # 每10个batch显示一次
-            print(f"Validation | Batch {batch_idx:4d} | "
+            print(f"\nValidation | Batch {batch_idx:4d} | "
                   f"Rec Loss: {rec_loss.item():.4f} | "
-                  f"AE Loss: {aeloss.item():.4f}", end="", flush=True)
+                  f"AE Loss: {aeloss.item():.4f}", end="", )
         
         self.log("val/rec_loss", rec_loss,
                    prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
