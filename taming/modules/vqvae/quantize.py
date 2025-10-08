@@ -286,11 +286,35 @@ class VectorQuantizer2(nn.Module):
         
         # 计算码本使用率和困惑度
         min_encodings = F.one_hot(min_encoding_indices, self.n_e).float()
-        e_mean = torch.mean(min_encodings, dim=0)
-        perplexity = torch.exp(-torch.sum(e_mean * torch.log(e_mean + 1e-10)))
         
-        # 计算码本使用率：实际被使用的码本向量比例
-        codebook_usage = torch.sum(e_mean > 0).float() / self.n_e
+        # 累计统计：累计所有批次的min_encodings
+        if not hasattr(self, 'accumulated_min_encodings'):
+            self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
+            self.accumulated_batch_count = 0
+        
+        # 累计当前批次的min_encodings
+        current_batch_encodings = min_encodings.sum(dim=0)  # 按码本索引求和
+        self.accumulated_min_encodings += current_batch_encodings
+        self.accumulated_batch_count += 1
+        
+        # 计算累计的码本使用率和困惑度
+        if self.accumulated_batch_count >= 128:
+            # 使用累计128个批次的数据计算
+            total_vectors = self.accumulated_min_encodings.sum()
+            e_mean_accumulated = self.accumulated_min_encodings / total_vectors
+            
+            # 重置累计值
+            self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
+            self.accumulated_batch_count = 0
+            
+            # 使用累计数据计算困惑度和码本使用率
+            perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
+            codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
+        else:
+            # 使用当前批次数据计算
+            e_mean = torch.mean(min_encodings, dim=0)
+            perplexity = torch.exp(-torch.sum(e_mean * torch.log(e_mean + 1e-10)))
+            codebook_usage = torch.sum(e_mean > 0).float() / self.n_e
 
         # compute loss for embedding
         if not self.legacy:

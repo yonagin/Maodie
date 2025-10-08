@@ -65,8 +65,16 @@ class VQModel(pl.LightningModule):
         if self.enable_maodie:
             self.discriminator = DirichletDiscriminator(n_embed)
         
+        # 累计统计相关参数
+        self.accumulated_batches = 0
+        self.accumulated_perplexity = 0.0
+        self.accumulated_codebook_usage = 0.0
+        self.accumulation_threshold = 128  # 累计128个批次计算一次
+        
         self.total_d_loss = 0
         self.total_g_loss = 0
+        self.last_printed_step = -1
+        self.last_printed_step = -1
         
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
@@ -137,7 +145,6 @@ class VQModel(pl.LightningModule):
                 xrec, qloss, p_fake, info = self(x, return_p=True)
             else:  # 原始判别器训练
                 xrec, qloss, info = self(x)
-            perplexity, _, _, codebook_usage = info
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
@@ -184,15 +191,25 @@ class VQModel(pl.LightningModule):
                     "train/dir_d_loss": torch.tensor(0.0)
                 }
                 log_dict_ae['train/total_loss'] = total_loss
-                codebook_usage_percent = codebook_usage * 100
+                
+                # 直接使用量化器返回的困惑度和码本使用率
+                if info is not None:
+                    # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
+                    perplexity, _, _, codebook_usage = info
+                    codebook_usage_percent = codebook_usage.item() * 100
+                else:
+                    # 没有info时使用默认值
+                    perplexity = torch.tensor(0.0)
+                    codebook_usage_percent = 0.0
     
-                if self.global_step % 10 == 0: 
+                if self.global_step % 10 == 0 and self.global_step != self.last_printed_step: 
                     print(f"\nStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
                           f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
                           f"Codebook Usage: {codebook_usage_percent:.2f}%",  )
+                    self.last_printed_step = self.global_step
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -218,7 +235,17 @@ class VQModel(pl.LightningModule):
             else:
                 xrec, qloss = result[:2]  # 只取前两个值
                 info = result[2] if len(result) > 2 else None
-            perplexity, _, _, codebook_usage = info
+            
+            # 直接使用量化器返回的困惑度和码本使用率
+            if info is not None:
+                # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
+                perplexity, _, _, codebook_usage = info
+                codebook_usage_percent = codebook_usage.item() * 100
+            else:
+                # 没有info时使用默认值
+                perplexity = torch.tensor(0.0)
+                codebook_usage_percent = 0.0
+            
             if optimizer_idx == 0:
                 # autoencode
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
@@ -239,7 +266,9 @@ class VQModel(pl.LightningModule):
                 
                 if self.global_step % 10 == 0:  # 每10步显示一次
                     print(f"\nStep {self.global_step:6d} | "
-                          f"Disc Loss: {discloss.item():.4f}",  )
+                          f"Disc Loss: {discloss.item():.4f} | "
+                          f"Perplexity: {perplexity.item():.4f} | "
+                          f"Codebook Usage: {codebook_usage_percent:.2f}%",  )
                 
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
