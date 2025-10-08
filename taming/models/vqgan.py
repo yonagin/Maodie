@@ -140,7 +140,7 @@ class VQModel(pl.LightningModule):
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 self.discriminator.requires_grad_(True)
-                p_real = self.sample_dirichlet_prior(x.size(0))
+                p_real = self.sample_dirichlet_prior(128)
                 
                 d_fake = self.discriminator(p_fake.detach())
                 d_real = self.discriminator(p_real)
