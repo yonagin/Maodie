@@ -73,9 +73,6 @@ class VQModel(pl.LightningModule):
         
         self.total_d_loss = 0
         self.total_g_loss = 0
-        self.last_printed_step = -1
-        self.last_printed_step = -1
-        
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
         self.image_key = image_key
@@ -202,14 +199,13 @@ class VQModel(pl.LightningModule):
                     perplexity = torch.tensor(0.0)
                     codebook_usage_percent = 0.0
     
-                if self.global_step % 10 == 0 and self.global_step != self.last_printed_step: 
+                if self.global_step % 16 == 0 : 
                     print(f"\nStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
                           f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
                           f"Codebook Usage: {codebook_usage_percent:.2f}%",  )
-                    self.last_printed_step = self.global_step
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -251,7 +247,7 @@ class VQModel(pl.LightningModule):
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-                if self.global_step % 10 == 0 and optimizer_idx == 0:  
+                if self.global_step % 16 == 0 and optimizer_idx == 0:  
                     print(f"\nStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f}",  )
 
@@ -264,7 +260,7 @@ class VQModel(pl.LightningModule):
                 discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
                 
-                if self.global_step % 10 == 0:  # 每10步显示一次
+                if self.global_step % 16 == 0: 
                     print(f"\nStep {self.global_step:6d} | "
                           f"Disc Loss: {discloss.item():.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
@@ -289,7 +285,7 @@ class VQModel(pl.LightningModule):
         rec_loss = log_dict_ae["val/rec_loss"]
         
         # 验证步骤进度条显示
-        if batch_idx % 10 == 0:  # 每10个batch显示一次
+        if batch_idx % 16 == 0:  # 每10个batch显示一次
             print(f"\nValidation | Batch {batch_idx:4d} | "
                   f"Rec Loss: {rec_loss.item():.4f} | "
                   f"AE Loss: {aeloss.item():.4f}",  )
