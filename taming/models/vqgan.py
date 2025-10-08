@@ -190,14 +190,10 @@ class VQModel(pl.LightningModule):
                 log_dict_ae['train/total_loss'] = total_loss
                 
                 # 直接使用量化器返回的困惑度和码本使用率
-                if info is not None:
                     # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
-                    perplexity, _, _, codebook_usage = info
-                    codebook_usage_percent = codebook_usage.item() * 100
-                else:
-                    # 没有info时使用默认值
-                    perplexity = torch.tensor(0.0)
-                    codebook_usage_percent = 0.0
+                perplexity, _, _, codebook_usage = info
+                codebook_usage_percent = codebook_usage.item() * 100
+
     
                 if self.global_step % 16 == 0 : 
                     print(f"\nStep {self.global_step:6d} | "
@@ -232,15 +228,9 @@ class VQModel(pl.LightningModule):
                 xrec, qloss = result[:2]  # 只取前两个值
                 info = result[2] if len(result) > 2 else None
             
-            # 直接使用量化器返回的困惑度和码本使用率
-            if info is not None:
-                # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
-                perplexity, _, _, codebook_usage = info
-                codebook_usage_percent = codebook_usage.item() * 100
-            else:
-                # 没有info时使用默认值
-                perplexity = torch.tensor(0.0)
-                codebook_usage_percent = 0.0
+            # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
+            perplexity, _, _, codebook_usage = info
+            codebook_usage_percent = codebook_usage.item() * 100
             
             if optimizer_idx == 0:
                 # autoencode

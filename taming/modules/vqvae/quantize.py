@@ -272,6 +272,8 @@ class VectorQuantizer2(nn.Module):
         assert temp is None or temp==1.0, "Only for interface compatible with Gumbel"
         assert rescale_logits==False, "Only for interface compatible with Gumbel"
         assert return_logits==False, "Only for interface compatible with Gumbel"
+        perplexity = torch.tensor(0.0)
+        codebook_usage = torch.tensor(0.0)
         # reshape z -> (batch, height, width, channel) and flatten
         z = rearrange(z, 'b c h w -> b h w c').contiguous()
         z_flattened = z.view(-1, self.e_dim)
@@ -286,7 +288,6 @@ class VectorQuantizer2(nn.Module):
         
         # 计算码本使用率和困惑度
         min_encodings = F.one_hot(min_encoding_indices, self.n_e).float()
-        
         # 累计统计：累计所有批次的min_encodings
         if not hasattr(self, 'accumulated_min_encodings'):
             self.accumulated_min_encodings = torch.zeros(self.n_e, device=z.device)
@@ -310,12 +311,7 @@ class VectorQuantizer2(nn.Module):
             # 使用累计数据计算困惑度和码本使用率
             perplexity = torch.exp(-torch.sum(e_mean_accumulated * torch.log(e_mean_accumulated + 1e-10)))
             codebook_usage = torch.sum(e_mean_accumulated > 0).float() / self.n_e
-        else:
-            # 使用当前批次数据计算
-            e_mean = torch.mean(min_encodings, dim=0)
-            perplexity = torch.exp(-torch.sum(e_mean * torch.log(e_mean + 1e-10)))
-            codebook_usage = torch.sum(e_mean > 0).float() / self.n_e
-
+        
         # compute loss for embedding
         if not self.legacy:
             loss = self.beta * torch.mean((z_q.detach()-z)**2) + \
