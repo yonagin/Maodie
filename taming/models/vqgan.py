@@ -195,13 +195,14 @@ class VQModel(pl.LightningModule):
                 codebook_usage_percent = codebook_usage.item() * 100
 
     
-                if batch_idx % 16 == 0 : 
-                    print(f"\nStep {self.global_step:6d} | "
-                          f"AE Loss: {aeloss.item():.4f} | "
-                          f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
-                          f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
-                          f"Perplexity: {perplexity.item():.4f} | "
-                          f"Codebook Usage: {codebook_usage_percent:.2f}%",  )
+                if self.global_step % 16 == 0:
+                    print(f"\n[DEBUG] global_step={self.global_step}, batch_idx={batch_idx}, optimizer_idx={optimizer_idx}")
+                    print(f"Step {self.global_step:6d} | "
+                            f"AE Loss: {aeloss.item():.4f} | "
+                            f"G Loss: {self.total_g_loss / (batch_idx+1):.4f} | "
+                            f"D Loss: {self.total_d_loss / (batch_idx+1):.4f} | "
+                            f"Perplexity: {perplexity.item():.4f} | "
+                            f"Codebook Usage: {codebook_usage_percent:.2f}%")
                 
                 self.log_dict(dir_losses, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
