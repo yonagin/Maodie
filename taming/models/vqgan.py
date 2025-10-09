@@ -43,6 +43,7 @@ class VQModel(pl.LightningModule):
                  temperature=1.0,  # maodie参数：温度参数
                  dirichlet_alpha=0.1,  # maodie参数：Dirichlet分布参数
                  lambda_adv=1e-4,  # maodie参数：对抗损失权重
+                 patch_size=4,  # 新增参数：窗口大小，用于窗口平均操作
                  ):
         super().__init__()
         self.image_key = image_key
@@ -60,6 +61,7 @@ class VQModel(pl.LightningModule):
         self.dirichlet_alpha = dirichlet_alpha
         self.lambda_adv = lambda_adv
         self.num_embeddings = n_embed
+        self.patch_size = patch_size  # 窗口大小参数
         
         # Maodie组件
         if self.enable_maodie:
@@ -120,11 +122,24 @@ class VQModel(pl.LightningModule):
             
             # 使用温度参数计算软分配
             p_soft = F.softmax(-distances / self.temperature, dim=-1)
-            # p_soft = p_soft.view(h.shape[0], h.shape[2], h.shape[3], -1)
             
-            # 全局平均池化得到(B, K)的概率向量
-            # p_global = p_soft.mean(dim=(1, 2))
-            return dec, diff, p_soft, info
+            # 引入窗口平均操作：将逐点概率转换为窗口级区域摘要
+            # 将 p_soft 从 (B*H*W, K) 重塑为 (B, H, W, K)
+            p_spatial = p_soft.view(h.shape[0], h.shape[2], h.shape[3], -1)
+            
+            # 使用平均池化进行窗口平均
+            # 将通道维度移到第二位以适配卷积操作
+            p_spatial_permuted = p_spatial.permute(0, 3, 1, 2)  # (B, K, H, W)
+            
+            # 应用平均池化，窗口大小为 patch_size
+            p_patch = F.avg_pool2d(p_spatial_permuted, 
+                                   kernel_size=self.patch_size, 
+                                   stride=self.patch_size)
+            
+            # 重塑为 (B*H'*W', K) 供判别器使用
+            p_patch_flat = p_patch.permute(0, 2, 3, 1).reshape(-1, self.num_embeddings)
+            
+            return dec, diff, p_patch_flat, info
         else:
             return dec, diff , info
         
