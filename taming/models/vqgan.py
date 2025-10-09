@@ -124,7 +124,7 @@ class VQModel(pl.LightningModule):
             
             # 全局平均池化得到(B, K)的概率向量
             # p_global = p_soft.mean(dim=(1, 2))
-            return dec, diff, p_global, info
+            return dec, diff, p_soft, info
         else:
             return dec, diff , info
         
