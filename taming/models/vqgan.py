@@ -120,10 +120,10 @@ class VQModel(pl.LightningModule):
             
             # 使用温度参数计算软分配
             p_soft = F.softmax(-distances / self.temperature, dim=-1)
-            p_soft = p_soft.view(h.shape[0], h.shape[2], h.shape[3], -1)
+            # p_soft = p_soft.view(h.shape[0], h.shape[2], h.shape[3], -1)
             
             # 全局平均池化得到(B, K)的概率向量
-            p_global = p_soft.mean(dim=(1, 2))
+            # p_global = p_soft.mean(dim=(1, 2))
             return dec, diff, p_global, info
         else:
             return dec, diff , info
@@ -135,7 +135,6 @@ class VQModel(pl.LightningModule):
             if optimizer_idx == 0:
                 # Maodie判别器训练（第一个优化器）
                 _, _, p_fake, _ = self(x, return_p=True)
-                self.discriminator.requires_grad_(True)
                 p_real = self.sample_dirichlet_prior(p_fake.shape[0])
                 
                 d_fake = self.discriminator(p_fake.detach())
@@ -159,7 +158,6 @@ class VQModel(pl.LightningModule):
                 return d_loss
                 
             elif optimizer_idx == 1:
-                self.discriminator.requires_grad_(False)  # 冻结判别器参数
                 xrec, qloss, p_fake, info = self(x, batch_idx, return_p=True)
                 # 生成器训练（VQ-VAE + 对抗损失，第二个优化器）
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
