@@ -303,7 +303,7 @@ class VQModel(pl.LightningModule):
             
             # Maodie判别器优化器（第一个）
             opt_disc_maodie = torch.optim.Adam(self.discriminator.parameters(),
-                                              lr=lr, betas=(0.5, 0.9))
+                                              lr=lr)
             optimizers.append(opt_disc_maodie)
             
             # 自编码器优化器（第二个）
