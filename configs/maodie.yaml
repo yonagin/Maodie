@@ -20,7 +20,7 @@ model:
     enable_maodie: true  # 启用Maodie对抗训练
     temperature: 1.0     # 温度参数，控制软分配的平滑度
     dirichlet_alpha: 0.1 # Dirichlet分布参数
-    lambda_adv: 1e-3    # 对抗损失权重
+    lambda_adv: 1e-4    # 对抗损失权重
     patch_size: 4       # 窗口大小，用于窗口平均操作
 
     lossconfig:
