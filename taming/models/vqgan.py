@@ -11,14 +11,13 @@ from taming.modules.vqvae.quantize import EMAVectorQuantizer
 
 # Maodie adversarial training components
 class DirichletDiscriminator(torch.nn.Module):
-    """判别器：区分真实Dirichlet样本和生成的软分配h"""
     def __init__(self, num_embeddings):
         super().__init__()
         self.net = torch.nn.Sequential(
             torch.nn.Linear(num_embeddings, 256),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(0.2, True),
             torch.nn.Linear(256, 128),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(0.2, True),
             torch.nn.Linear(128, 1),
         )
         
