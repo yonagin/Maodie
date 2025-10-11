@@ -240,10 +240,9 @@ class VQModel(pl.LightningModule):
 
                 if self.global_step % 32 == 0 and optimizer_idx == 0:  
                     print(f"\nStep {self.global_step:6d} | "
-                          f"AE Loss: {aeloss.item():.4f} | ",
-                          f"Disc Loss: {discloss.item():.4f} | "
+                          f"AE Loss: {aeloss.item():.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
-                          f"Codebook Usage: {codebook_usage_percent:.2f}%",)
+                          f"Codebook Usage: {codebook_usage_percent:.2f}%")
 
                 self.log("train/aeloss", aeloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
@@ -253,7 +252,9 @@ class VQModel(pl.LightningModule):
                 # discriminator
                 discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
-                
+                if self.global_step % 32 == 0 and optimizer_idx == 0:  
+                    print(f"\nStep {self.global_step:6d} | ",
+                          f"Disc Loss: {discloss.item():.4f} | ")
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
                 return discloss
