@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 4.5e-5
+  base_learning_rate: 4.5e-6
   target: taming.models.vqgan.VQModel
   params:
     embed_dim: 256
