@@ -228,7 +228,7 @@ class VQModel(pl.LightningModule):
         
 
         else:
-            xrec, qloss, info = self(x)
+            xrec, qloss, info = self(x,batch_idx)
             # 量化器返回4个值：perplexity, min_encodings, min_encoding_indices, codebook_usage
             perplexity, _, _, codebook_usage = info
             codebook_usage_percent = codebook_usage.item() * 100
@@ -238,7 +238,7 @@ class VQModel(pl.LightningModule):
                 aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-                if self.global_step % 32 == 0 and optimizer_idx == 0:  
+                if (self.global_step+1) % 32 == 0:  
                     print(f"\nStep {self.global_step:6d} | "
                           f"AE Loss: {aeloss.item():.4f} | "
                           f"Perplexity: {perplexity.item():.4f} | "
@@ -252,7 +252,7 @@ class VQModel(pl.LightningModule):
                 # discriminator
                 discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
-                if self.global_step % 32 == 0 and optimizer_idx == 0:  
+                if (self.global_step+1) % 32 == 0:  
                     print(f"\nStep {self.global_step:6d} | ",
                           f"Disc Loss: {discloss.item():.4f} | ")
                 self.log("train/discloss", discloss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
