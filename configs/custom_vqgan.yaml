@@ -4,6 +4,7 @@ model:
   params:
     embed_dim: 256
     n_embed: 1024
+    legacy: True
     ddconfig:
       double_z: False
       z_channels: 256
