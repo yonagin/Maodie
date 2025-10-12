@@ -124,7 +124,7 @@ def visualize_codebook_usage(model, data_loader, device, title, filename):
             data = data.to(device)
             z_e = model.encoder(data)
             _, _, _, indices, _ = model.vq(z_e)
-            all_indices.append(indices.cpu().numpy().flatten())
+            all_indices.append(indices.cpu().numpy())
             
     all_indices = np.concatenate(all_indices)
     counts = np.bincount(all_indices, minlength=model.vq.num_embeddings)
