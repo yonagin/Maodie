@@ -34,7 +34,7 @@ def visualize_reconstructions(data, recon, filename="fig_reconstructions"):
     fig = plt.figure(figsize=(15, 6))
     plt.imshow(grid.permute(1, 2, 0))
     plt.title("Reconstruction Comparison", fontsize=16)
-    plt.yticks([32*0.5, 32*1.0], ["Original", "Maodie (Ours)"], rotation=90, va='center', fontsize=12)
+    plt.yticks([32*0.5, 32*1.0], ["Original", "Recon"], rotation=90, va='center', fontsize=12)
     plt.xticks([])
     plt.tight_layout()
     plt.savefig(f"{filename}.png")
