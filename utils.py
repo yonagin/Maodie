@@ -27,13 +27,14 @@ def visualize_reconstructions(data, recon, filename="fig_reconstructions"):
     comparison = torch.cat([originals, recon])
     grid = make_grid(comparison, nrow=data.shape[0])
     
-    plt.figure(figsize=(15, 6))
+    fig = plt.figure(figsize=(15, 6))
     plt.imshow(grid.permute(1, 2, 0))
     plt.title("Reconstruction Comparison", fontsize=16)
     plt.yticks([32*0.5, 32*1.0], ["Original", "Maodie (Ours)"], rotation=90, va='center', fontsize=12)
     plt.xticks([])
     plt.tight_layout()
     plt.savefig(f"{filename}.png")
+    plt.close(fig)  # 关闭图形释放内存
     print(f"Saved '{filename}.png'")
 
 
@@ -47,7 +48,6 @@ def evaluate(model, test_loader, device):
             x_recon, indices= model.reconstruct(data)
             all_indices.append(indices.cpu().numpy())
             total_mse += F.mse_loss(x_recon, data, reduction='sum').item()
-            all_indices.append(indices.cpu().numpy())
             
     avg_mse = total_mse / (len(test_loader.dataset) * 3 * 32 * 32)
     psnr = compute_psnr(avg_mse)
@@ -88,7 +88,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
     codebook_tsne = tsne_results[len(z_e_flat):]
     
     # Plotting
-    plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(8, 8))
     plt.scatter(z_e_tsne[:, 0], z_e_tsne[:, 1], alpha=0.1, label='Encoder Outputs (z_e)')
     
     used_code_vectors = [c for i, c in enumerate(codebook_tsne) if i in used_indices]
@@ -109,6 +109,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
     plt.legend()
     plt.tight_layout()
     plt.savefig(filename)
+    plt.close(fig)  # 关闭图形释放内存
     print(f"Saved '{filename}'")
 
 
@@ -130,11 +131,12 @@ def visualize_codebook_usage(model, data_loader, device, title, filename):
     
     usage_rate = np.count_nonzero(counts) / model.vq.num_embeddings
     
-    plt.figure(figsize=(10, 5))
+    fig = plt.figure(figsize=(10, 5))
     plt.bar(range(model.vq.num_embeddings), counts, width=1.0)
     plt.title(f"Codebook Usage: {title} (Usage: {usage_rate:.2%})", fontsize=14)
     plt.xlabel("Codebook Index")
     plt.ylabel("Frequency")
     plt.tight_layout()
     plt.savefig(filename)
+    plt.close(fig)  # 关闭图形释放内存
     print(f"Saved '{filename}'")

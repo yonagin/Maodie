@@ -168,7 +168,7 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     print("\nGenerating training results visualization...")
     
     # Loss curves
-    plt.figure(figsize=(15, 10))
+    fig = plt.figure(figsize=(15, 10))
     
     plt.subplot(2, 3, 1)
     plt.plot(train_losses)
@@ -207,6 +207,7 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     
     plt.tight_layout()
     plt.savefig(f"maodie_training_curves_step_{total_training_steps}.png")
+    plt.close(fig)  # 关闭图形释放内存
     print(f"Saved training curves: maodie_training_curves_step_{total_training_steps}.png")
     
     # Latent space visualization
