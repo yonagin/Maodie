@@ -8,9 +8,13 @@ from tqdm import tqdm
 
 
 def compute_psnr(mse):
+    """
+    Compute PSNR from MSE value.
+    Assumes pixel values are in [0, 255] range after clamping.
+    """
     if mse == 0:
         return 100
-    return 10 * np.log10(4.0 / mse)
+    return 10 * np.log10(255.0 * 255.0 / mse)
 
 def compute_codebook_usage(all_indices, num_embeddings):
     unique_codes = len(np.unique(all_indices))
@@ -46,8 +50,18 @@ def evaluate(model, test_loader, device):
         for data, _ in test_loader:
             data = data.to(device)
             x_recon, indices= model.reconstruct(data)
+            
+            # Clamp reconstructed images to [0, 255] range for proper PSNR calculation
+            # Original data is normalized to [-1, 1], so we need to denormalize first
+            data_denorm = (data * 0.5 + 0.5) * 255.0  # [-1, 1] -> [0, 255]
+            x_recon_denorm = (x_recon * 0.5 + 0.5) * 255.0  # [-1, 1] -> [0, 255]
+            
+            # Clamp to valid pixel range
+            data_denorm = data_denorm.clamp(0, 255)
+            x_recon_denorm = x_recon_denorm.clamp(0, 255)
+            
             all_indices.append(indices.cpu().numpy())
-            total_mse += F.mse_loss(x_recon, data, reduction='sum').item()
+            total_mse += F.mse_loss(x_recon_denorm, data_denorm, reduction='sum').item()
             
     avg_mse = total_mse / (len(test_loader.dataset) * 3 * 32 * 32)
     psnr = compute_psnr(avg_mse)
