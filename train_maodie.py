@@ -220,7 +220,7 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"Maodie VQ-VAE (Codebook Size: {num_embeddings})",
+        f"Maodie VQ(Codebook Size: {num_embeddings})",
         f"maodie_codebook_usage_step_{total_training_steps}.png"
     )
 
