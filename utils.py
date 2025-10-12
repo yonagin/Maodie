@@ -17,13 +17,13 @@ def compute_codebook_usage(all_indices, num_embeddings):
     return unique_codes / num_embeddings
 
 def visualize_reconstructions(data, recon):
-    """可视化重建效果对比"""
+    """Visualize reconstruction comparison"""
     print("\nGenerating reconstruction comparison...")
     # un-normalize: (img * 0.5) + 0.5
     originals = (data.cpu() * 0.5 + 0.5).clamp(0, 1)
     recon = (recon.cpu() * 0.5 + 0.5).clamp(0, 1)
 
-    # 将图像拼接在一起
+    # Concatenate images together
     comparison = torch.cat([originals, recon])
     grid = make_grid(comparison, nrow=data.shape[0])
     
@@ -38,7 +38,7 @@ def visualize_reconstructions(data, recon):
 
 
 def evaluate(model, test_loader, device):
-    """评估模型"""
+    """Evaluate model performance"""
     model.eval()
     total_mse, all_indices = 0, []
     with torch.no_grad():
@@ -57,7 +57,7 @@ def evaluate(model, test_loader, device):
 
 
 def visualize_latent_space(model, data_loader, device, title, filename, n_batches=5):
-    """使用t-SNE可视化潜在空间和码本"""
+    """Visualize latent space and codebook using t-SNE"""
     print(f"\nGenerating latent space visualization for {title}...")
     model.eval()
     
@@ -70,7 +70,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
                 break
             data = data.to(device)
             z_e = model.encoder(data)
-            z_e = self.pre_quantization_conv(z_e)
+            z_e = model.pre_quantization_conv(z_e)
             all_z_e_flat.append(z_e.permute(0, 2, 3, 1).reshape(-1, model.vq.embedding_dim))
             
             _, _, _, indices, _ = model.vq(z_e)
@@ -79,7 +79,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
     z_e_flat = torch.cat(all_z_e_flat, dim=0).cpu().numpy()
     codebook = model.vq.embedding.weight.data.cpu().numpy()
     
-    # 使用t-SNE降维
+    # Use t-SNE for dimensionality reduction
     tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
     combined = np.vstack([z_e_flat, codebook])
     tsne_results = tsne.fit_transform(combined)
@@ -87,7 +87,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
     z_e_tsne = tsne_results[:len(z_e_flat)]
     codebook_tsne = tsne_results[len(z_e_flat):]
     
-    # 绘图
+    # Plotting
     plt.figure(figsize=(8, 8))
     plt.scatter(z_e_tsne[:, 0], z_e_tsne[:, 1], alpha=0.1, label='Encoder Outputs (z_e)')
     
@@ -113,7 +113,7 @@ def visualize_latent_space(model, data_loader, device, title, filename, n_batche
 
 
 def visualize_codebook_usage(model, data_loader, device, title, filename):
-    """可视化码本使用频率"""
+    """Visualize codebook usage frequency"""
     print(f"\nGenerating codebook usage histogram for {title}...")
     model.eval()
     all_indices = []

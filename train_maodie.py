@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Maodie VQ-VAE 训练脚本
-支持对抗训练和可视化功能
+Maodie VQ-VAE Training Script
+Support adversarial training and visualization functions
 """
 
 import os
@@ -17,14 +17,14 @@ from torchvision.utils import make_grid
 from sklearn.manifold import TSNE
 from tqdm import tqdm
 
-# 导入模型和工具函数
+# Import models and utility functions
 from models.vqvae import MaodieVQ
 from utils import (
     compute_psnr, compute_codebook_usage, visualize_reconstructions,
     evaluate, visualize_latent_space, visualize_codebook_usage
 )
 
-# 训练参数
+# Training parameters
 batch_size = 128
 total_training_steps = 10000
 eval_interval = 1000
@@ -36,26 +36,26 @@ lambda_adv = 1e-4
 temperature = 1.0
 dirichlet_alpha = 0.1
 
-# 模型参数
+# Model parameters
 h_dim = 64
 res_h_dim = 32
 n_res_layers = 2
 
-# 设备设置
+# Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"使用设备: {device}")
+print(f"Using device: {device}")
 
 def load_cifar10_dataset():
-    """加载CIFAR-10数据集"""
-    print("正在加载CIFAR-10数据集...")
+    """Load CIFAR-10 dataset"""
+    print("Loading CIFAR-10 dataset...")
     
-    # 数据预处理
+    # Data preprocessing
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     
-    # 下载训练集
+    # Download training set
     trainset = torchvision.datasets.CIFAR10(
         root='./data', 
         train=True, 
@@ -63,7 +63,7 @@ def load_cifar10_dataset():
         transform=transform
     )
     
-    # 下载测试集
+    # Download test set
     testset = torchvision.datasets.CIFAR10(
         root='./data', 
         train=False, 
@@ -71,24 +71,24 @@ def load_cifar10_dataset():
         transform=transform
     )
     
-    # 创建数据加载器
+    # Create data loaders
     train_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
     test_loader = DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
     
-    print(f"训练集大小: {len(trainset)}")
-    print(f"测试集大小: {len(testset)}")
-    print(f"类别: {trainset.classes}")
+    print(f"Training set size: {len(trainset)}")
+    print(f"Test set size: {len(testset)}")
+    print(f"Classes: {trainset.classes}")
     
     return train_loader, test_loader
 
 def create_model():
-    """创建Maodie模型"""
-    print("正在创建Maodie模型...")
-    print(f"码本大小: {num_embeddings}")
-    print(f"嵌入维度: {embedding_dim}")
-    print(f"对抗权重: {lambda_adv}")
-    print(f"温度参数: {temperature}")
-    print(f"Dirichlet参数: {dirichlet_alpha}")
+    """Create Maodie model"""
+    print("Creating Maodie model...")
+    print(f"Codebook size: {num_embeddings}")
+    print(f"Embedding dimension: {embedding_dim}")
+    print(f"Adversarial weight: {lambda_adv}")
+    print(f"Temperature parameter: {temperature}")
+    print(f"Dirichlet parameter: {dirichlet_alpha}")
     
     model = MaodieVQ(
         h_dim=h_dim,
@@ -105,7 +105,7 @@ def create_model():
     return model
 
 def setup_optimizers(model):
-    """设置优化器"""
+    """Setup optimizers"""
     optimizer_G = optim.Adam(
         list(model.encoder.parameters()) + 
         list(model.pre_quantization_conv.parameters()) +
@@ -122,17 +122,17 @@ def setup_optimizers(model):
     return optimizer_G, optimizer_D
 
 def train_model(model, train_loader, test_loader):
-    """训练模型"""
+    """Train model"""
     optimizer_G, optimizer_D = setup_optimizers(model)
     
-    # 训练统计
+    # Training statistics
     train_losses = []
     recon_losses = []
     vq_losses = []
     disc_losses = []
     perplexities = []
     
-    print("开始训练...")
+    print("Starting training...")
     
     step = 0
     while step < total_training_steps:
@@ -144,39 +144,39 @@ def train_model(model, train_loader, test_loader):
                 
             data = data.to(device)
             
-            # 训练步骤
+            # Training step
             recon_loss, vq_loss, disc_loss, perplexity = model.training_step(
                 data, optimizer_G, optimizer_D, lambda_adv=lambda_adv
             )
             
-            # 记录统计信息
+            # Record statistics
             train_losses.append(recon_loss + vq_loss)
             recon_losses.append(recon_loss)
             vq_losses.append(vq_loss)
             disc_losses.append(disc_loss)
             perplexities.append(perplexity)
             
-            # 定期评估
+            # Periodic evaluation
             if step % eval_interval == 0:
-                # 计算最近eval_interval步的平均值
+                # Calculate average of recent eval_interval steps
                 recent_start = max(0, len(train_losses) - eval_interval)
                 recent_recon_loss = np.mean(recon_losses[recent_start:])
                 recent_vq_loss = np.mean(vq_losses[recent_start:])
                 recent_disc_loss = np.mean(disc_losses[recent_start:])
                 recent_perplexity = np.mean(perplexities[recent_start:])
                 
-                print(f"\n步骤 {step}/{total_training_steps}:")
-                print(f"重建损失: {recent_recon_loss:.4f}")
-                print(f"VQ损失: {recent_vq_loss:.4f}")
-                print(f"判别器损失: {recent_disc_loss:.4f}")
-                print(f"困惑度: {recent_perplexity:.2f}")
+                print(f"\nStep {step}/{total_training_steps}:")
+                print(f"Reconstruction loss: {recent_recon_loss:.4f}")
+                print(f"VQ loss: {recent_vq_loss:.4f}")
+                print(f"Discriminator loss: {recent_disc_loss:.4f}")
+                print(f"Perplexity: {recent_perplexity:.2f}")
                 
-                # 评估模型
+                # Evaluate model
                 eval_results = evaluate(model, test_loader, device)
                 print(f"PSNR: {eval_results['psnr']:.2f}")
-                print(f"码本使用率: {eval_results['codebook_usage']:.2%}")
+                print(f"Codebook usage: {eval_results['codebook_usage']:.2%}")
                 
-                # 可视化重建效果
+                # Visualize reconstruction results
                 with torch.no_grad():
                     model.eval()
                     test_batch, _ = next(iter(test_loader))
@@ -187,114 +187,114 @@ def train_model(model, train_loader, test_loader):
             step += 1
             
             if step % 100 == 0:
-                print(f"进度: {step}/{total_training_steps}", end="\r")
+                print(f"Progress: {step}/{total_training_steps}", end="\r")
     
     return train_losses, recon_losses, vq_losses, disc_losses, perplexities
 
 def visualize_training_results(model, test_loader, train_losses, recon_losses, vq_losses, disc_losses, perplexities):
-    """可视化训练结果"""
-    print("\n正在生成训练结果可视化...")
+    """Visualize training results"""
+    print("\nGenerating training results visualization...")
     
-    # 损失曲线
+    # Loss curves
     plt.figure(figsize=(15, 10))
     
     plt.subplot(2, 3, 1)
     plt.plot(train_losses)
-    plt.title(f"总损失曲线 (码本大小: {num_embeddings})")
-    plt.xlabel("训练步数")
-    plt.ylabel("损失")
+    plt.title(f"Total Loss Curve (Codebook Size: {num_embeddings})")
+    plt.xlabel("Training Steps")
+    plt.ylabel("Loss")
     plt.grid(True)
     
     plt.subplot(2, 3, 2)
     plt.plot(recon_losses)
-    plt.title(f"重建损失曲线 (码本大小: {num_embeddings})")
-    plt.xlabel("训练步数")
-    plt.ylabel("重建损失")
+    plt.title(f"Reconstruction Loss Curve (Codebook Size: {num_embeddings})")
+    plt.xlabel("Training Steps")
+    plt.ylabel("Reconstruction Loss")
     plt.grid(True)
     
     plt.subplot(2, 3, 3)
     plt.plot(vq_losses)
-    plt.title(f"VQ损失曲线 (码本大小: {num_embeddings})")
-    plt.xlabel("训练步数")
-    plt.ylabel("VQ损失")
+    plt.title(f"VQ Loss Curve (Codebook Size: {num_embeddings})")
+    plt.xlabel("Training Steps")
+    plt.ylabel("VQ Loss")
     plt.grid(True)
     
     plt.subplot(2, 3, 4)
     plt.plot(disc_losses)
-    plt.title(f"判别器损失曲线 (码本大小: {num_embeddings})")
-    plt.xlabel("训练步数")
-    plt.ylabel("判别器损失")
+    plt.title(f"Discriminator Loss Curve (Codebook Size: {num_embeddings})")
+    plt.xlabel("Training Steps")
+    plt.ylabel("Discriminator Loss")
     plt.grid(True)
     
     plt.subplot(2, 3, 5)
     plt.plot(perplexities)
-    plt.title(f"困惑度曲线 (码本大小: {num_embeddings})")
-    plt.xlabel("训练步数")
-    plt.ylabel("困惑度")
+    plt.title(f"Perplexity Curve (Codebook Size: {num_embeddings})")
+    plt.xlabel("Training Steps")
+    plt.ylabel("Perplexity")
     plt.grid(True)
     
     plt.tight_layout()
     plt.savefig("training_curves.png")
-    print("保存训练曲线图: training_curves.png")
+    print("Saved training curves: training_curves.png")
     
-    # 潜在空间可视化
+    # Latent space visualization
     visualize_latent_space(
         model, test_loader, device, 
-        f"Maodie VQ-VAE (码本大小: {num_embeddings})",
+        f"Maodie VQ-VAE (Codebook Size: {num_embeddings})",
         "latent_space_visualization.png"
     )
     
-    # 码本使用情况可视化
+    # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"Maodie VQ-VAE (码本大小: {num_embeddings})",
+        f"Maodie VQ-VAE (Codebook Size: {num_embeddings})",
         "codebook_usage.png"
     )
 
 def main():
-    """主函数"""
-    print("=== Maodie VQ-VAE 训练脚本 ===")
-    print(f"码本大小: {num_embeddings}")
-    print(f"嵌入维度: {embedding_dim}")
-    print(f"批次大小: {batch_size}")
-    print(f"总训练步数: {total_training_steps}")
+    """Main function"""
+    print("=== Maodie VQ-VAE Training Script ===")
+    print(f"Codebook size: {num_embeddings}")
+    print(f"Embedding dimension: {embedding_dim}")
+    print(f"Batch size: {batch_size}")
+    print(f"Total training steps: {total_training_steps}")
     
-    # 创建输出目录
+    # Create output directory
     os.makedirs("./results", exist_ok=True)
     
-    # 加载数据
+    # Load data
     train_loader, test_loader = load_cifar10_dataset()
     
-    # 创建模型
+    # Create model
     model = create_model()
     
-    # 训练模型
+    # Train model
     train_losses, recon_losses, vq_losses, disc_losses, perplexities = train_model(
         model, train_loader, test_loader
     )
     
-    # 最终评估
-    print("\n=== 最终评估 ===")
+    # Final evaluation
+    print("\n=== Final Evaluation ===")
     eval_results = evaluate(model, test_loader, device)
-    print(f"最终 PSNR: {eval_results['psnr']:.2f}")
-    print(f"最终码本使用率: {eval_results['codebook_usage']:.2%}")
+    print(f"Final PSNR: {eval_results['psnr']:.2f}")
+    print(f"Final codebook usage: {eval_results['codebook_usage']:.2%}")
     
-    # 可视化结果
+    # Visualize results
     visualize_training_results(
         model, test_loader, train_losses, recon_losses, 
         vq_losses, disc_losses, perplexities
     )
     
-    # 保存模型
+    # Save model
     torch.save(model.state_dict(), f"maodie_model_{num_embeddings}.pth")
-    print(f"模型已保存: maodie_model_{num_embeddings}.pth")
+    print(f"Model saved: maodie_model_{num_embeddings}.pth")
     
-    print("\n=== 训练完成 ===")
-    print("生成的可视化文件:")
-    print("- fig_reconstructions.png: 重建效果对比")
-    print("- training_curves.png: 训练损失曲线")
-    print("- latent_space_visualization.png: 潜在空间可视化")
-    print("- codebook_usage.png: 码本使用情况")
+    print("\n=== Training Completed ===")
+    print("Generated visualization files:")
+    print("- fig_reconstructions.png: Reconstruction comparison")
+    print("- training_curves.png: Training loss curves")
+    print("- latent_space_visualization.png: Latent space visualization")
+    print("- codebook_usage.png: Codebook usage")
 
 if __name__ == "__main__":
     main()
