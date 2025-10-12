@@ -129,7 +129,7 @@ def visualize_codebook_usage(model, data_loader, device, title, filename):
     all_indices = np.concatenate(all_indices)
     counts = np.bincount(all_indices, minlength=model.vq.num_embeddings)
     
-    usage_rate = np.count_nonzero(counts) / model.vq.num_embeddings
+    usage_rate = compute_codebook_usage(all_indices, model.vq.num_embeddings)
     
     fig = plt.figure(figsize=(10, 5))
     plt.bar(range(model.vq.num_embeddings), counts, width=1.0)
