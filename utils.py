@@ -122,6 +122,7 @@ def visualize_codebook_usage(model, data_loader, device, title, filename):
     with torch.no_grad():
         for data, _ in tqdm(data_loader, desc=f"Collecting indices for {title}"):
             data = data.to(device)
+            # Reconstruct data to get indices
             _, indices= model.reconstruct(data)
             all_indices.append(indices.cpu().numpy())
             
