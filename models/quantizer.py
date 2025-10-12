@@ -45,7 +45,7 @@ class VectorQuantizer(nn.Module):
         z_q = z_q.permute(0, 3, 1, 2).contiguous()
         
         # 困惑度（衡量码本使用多样性）
-        avg_probs = torch.mean(encodings_indices, dim=0)
+        avg_probs = torch.mean(encoding_indices, dim=0)
         perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
         
         return z_q, loss, perplexity, encoding_indices, distances
