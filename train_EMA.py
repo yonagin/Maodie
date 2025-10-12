@@ -12,7 +12,7 @@ from sklearn.manifold import TSNE
 from tqdm import tqdm
 
 # Import models and utility functions
-from models.vqvae import MaodieVQ
+from models.vqvae import EMAVQ
 from utils import (
     compute_psnr, compute_codebook_usage, visualize_reconstructions,
     evaluate, visualize_latent_space, visualize_codebook_usage
@@ -55,32 +55,32 @@ def load_cifar10_dataset():
     
     return train_loader, test_loader
 
+
 def create_model():
-    """Create Maodie model"""
-    print("Creating Maodie model...")
+    """Create EMA model"""
+    print("Creating EMA VQ-VAE model...")
     print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
-    print(f"Adversarial weight: {lambda_adv}")
-    print(f"Temperature parameter: {temperature}")
-    print(f"Dirichlet parameter: {dirichlet_alpha}")
+    print(f"EMA decay rate: {ema_decay}")
+    print(f"Commitment cost: {commitment_cost}")
     
-    model = MaodieVQ(
+    model = EMAVQ(
         h_dim=h_dim,
         res_h_dim=res_h_dim,
         n_res_layers=n_res_layers,
         n_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
         beta=commitment_cost,
-        dirichlet_alpha=dirichlet_alpha,
-        temperature=temperature,
-        patch_size=patch_size,
+        decay=ema_decay,
+        eps=ema_eps
     ).to(device)
     
     return model
 
-def setup_optimizers(model):
-    """Setup optimizers"""
-    optimizer_G = optim.Adam(
+
+def setup_optimizer(model):
+    """Setup optimizer for EMA model"""
+    optimizer = optim.Adam(
         list(model.encoder.parameters()) + 
         list(model.pre_quantization_conv.parameters()) +
         list(model.vq.parameters()) + 
@@ -88,22 +88,17 @@ def setup_optimizers(model):
         lr=lr
     )
     
-    optimizer_D = optim.Adam(
-        model.discriminator.parameters(),
-        lr=lr
-    )
-    
-    return optimizer_G, optimizer_D
+    return optimizer
+
 
 def train_model(model, train_loader, test_loader):
-    """Train model"""
-    optimizer_G, optimizer_D = setup_optimizers(model)
+    """Train EMA model"""
+    optimizer = setup_optimizer(model)
     
     # Training statistics
     train_losses = []
     recon_losses = []
     vq_losses = []
-    disc_losses = []
     perplexities = []
     
     print("Starting training...")
@@ -119,30 +114,26 @@ def train_model(model, train_loader, test_loader):
             data = data.to(device)
             
             # Training step
-            recon_loss, vq_loss, disc_loss, perplexity = model.training_step(
-                data, optimizer_G, optimizer_D, lambda_adv=lambda_adv
-            )
+            recon_loss, vq_loss, perplexity = model.training_step(data, optimizer)
             
             # Record statistics
             train_losses.append(recon_loss + vq_loss)
             recon_losses.append(recon_loss)
             vq_losses.append(vq_loss)
-            disc_losses.append(disc_loss)
             perplexities.append(perplexity)
             step += 1
+            
             # Periodic evaluation
             if step % eval_interval == 0:
                 # Calculate average of recent eval_interval steps
                 recent_start = max(0, len(train_losses) - eval_interval)
                 recent_recon_loss = np.mean(recon_losses[recent_start:])
                 recent_vq_loss = np.mean(vq_losses[recent_start:])
-                recent_disc_loss = np.mean(disc_losses[recent_start:])
                 recent_perplexity = np.mean(perplexities[recent_start:])
                 
                 print(f"\nStep {step}/{total_training_steps}:")
                 print(f"Reconstruction loss: {recent_recon_loss:.4f}")
                 print(f"VQ loss: {recent_vq_loss:.4f}")
-                print(f"Discriminator loss: {recent_disc_loss:.4f}")
                 print(f"Perplexity: {recent_perplexity:.2f}")
                 
                 # Evaluate model
@@ -156,75 +147,67 @@ def train_model(model, train_loader, test_loader):
                     test_batch, _ = next(iter(test_loader))
                     test_batch = test_batch[:8].to(device)
                     recon_batch, _ = model.reconstruct(test_batch)
-                    visualize_reconstructions(test_batch, recon_batch, f"maodie_reconstructions_step_{step}")
+                    visualize_reconstructions(test_batch, recon_batch, f"ema_reconstructions_step_{step}")
             
             if step % 100 == 0:
                 print(f"Progress: {step}/{total_training_steps}", end="\r")
     
-    return train_losses, recon_losses, vq_losses, disc_losses, perplexities
+    return train_losses, recon_losses, vq_losses, perplexities
 
-def visualize_training_results(model, test_loader, train_losses, recon_losses, vq_losses, disc_losses, perplexities):
-    """Visualize training results"""
+
+def visualize_training_results(model, test_loader, train_losses, recon_losses, vq_losses, perplexities):
+    """Visualize training results for EMA model"""
     print("\nGenerating training results visualization...")
     
     # Loss curves
-    plt.figure(figsize=(15, 10))
+    plt.figure(figsize=(15, 8))
     
-    plt.subplot(2, 3, 1)
+    plt.subplot(2, 2, 1)
     plt.plot(train_losses)
-    plt.title(f"Total Loss Curve (Codebook Size: {num_embeddings})")
+    plt.title(f"Total Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Loss")
     plt.grid(True)
     
-    plt.subplot(2, 3, 2)
+    plt.subplot(2, 2, 2)
     plt.plot(recon_losses)
-    plt.title(f"Reconstruction Loss Curve (Codebook Size: {num_embeddings})")
+    plt.title(f"Reconstruction Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Reconstruction Loss")
     plt.grid(True)
     
-    plt.subplot(2, 3, 3)
+    plt.subplot(2, 2, 3)
     plt.plot(vq_losses)
-    plt.title(f"VQ Loss Curve (Codebook Size: {num_embeddings})")
+    plt.title(f"VQ Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("VQ Loss")
     plt.grid(True)
     
-    plt.subplot(2, 3, 4)
-    plt.plot(disc_losses)
-    plt.title(f"Discriminator Loss Curve (Codebook Size: {num_embeddings})")
-    plt.xlabel("Training Steps")
-    plt.ylabel("Discriminator Loss")
-    plt.grid(True)
-    
-    plt.subplot(2, 3, 5)
+    plt.subplot(2, 2, 4)
     plt.plot(perplexities)
-    plt.title(f"Perplexity Curve (Codebook Size: {num_embeddings})")
+    plt.title(f"Perplexity Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Perplexity")
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(f"maodie_training_curves_step_{total_training_steps}.png")
-    print(f"Saved training curves: maodie_training_curves_step_{total_training_steps}.png")
+    plt.savefig(f"ema_training_curves_step_{total_training_steps}.png")
+    print(f"Saved training curves: ema_training_curves_step_{total_training_steps}.png")
     
     # Latent space visualization
     visualize_latent_space(
         model, test_loader, device, 
-        f"Maodie VQ-VAE (Codebook Size: {num_embeddings})",
-        f"maodie_latent_space_step_{total_training_steps}.png"
+        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
+        f"ema_latent_space_step_{total_training_steps}.png"
     )
     
     # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"Maodie VQ-VAE (Codebook Size: {num_embeddings})",
-        f"maodie_codebook_usage_step_{total_training_steps}.png"
+        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
+        f"ema_codebook_usage_step_{total_training_steps}.png"
     )
 
-
- 
 
 if __name__ == "__main__":
     # Training parameters
@@ -235,10 +218,8 @@ if __name__ == "__main__":
     num_embeddings = 1024
     embedding_dim = 64
     commitment_cost = 0.25
-    lambda_adv = 1e-4
-    temperature = 1.0
-    dirichlet_alpha = 0.1
-    patch_size = 2
+    ema_decay = 0.99
+    ema_eps = 1e-5
 
     # Model parameters
     h_dim = 64
@@ -248,10 +229,12 @@ if __name__ == "__main__":
     # Device setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
+    
     """Main function"""
-    print("=== Maodie VQ-VAE Training Script ===")
+    print("=== EMA VQ-VAE Training Script ===")
     print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
+    print(f"EMA decay rate: {ema_decay}")
     print(f"Batch size: {batch_size}")
     print(f"Total training steps: {total_training_steps}")
     
@@ -265,7 +248,7 @@ if __name__ == "__main__":
     model = create_model()
     
     # Train model
-    train_losses, recon_losses, vq_losses, disc_losses, perplexities = train_model(
+    train_losses, recon_losses, vq_losses, perplexities = train_model(
         model, train_loader, test_loader
     )
     
@@ -277,17 +260,16 @@ if __name__ == "__main__":
     
     # Visualize results
     visualize_training_results(
-        model, test_loader, train_losses, recon_losses, 
-        vq_losses, disc_losses, perplexities
+        model, test_loader, train_losses, recon_losses, vq_losses, perplexities
     )
     
     # Save model
-    torch.save(model.state_dict(), f"maodie_model_{num_embeddings}.pth")
-    print(f"Model saved: maodie_model_{num_embeddings}.pth")
+    torch.save(model.state_dict(), f"ema_model_{num_embeddings}.pth")
+    print(f"Model saved: ema_model_{num_embeddings}.pth")
     
     print("\n=== Training Completed ===")
     print("Generated visualization files:")
-    print(f"- maodie_reconstructions_step_*.png: Reconstruction comparisons at different steps")
-    print(f"- maodie_training_curves_step_{total_training_steps}.png: Training loss curves")
-    print(f"- maodie_latent_space_step_{total_training_steps}.png: Latent space visualization")
-    print(f"- maodie_codebook_usage_step_{total_training_steps}.png: Codebook usage")
+    print(f"- ema_reconstructions_step_*.png: Reconstruction comparisons at different steps")
+    print(f"- ema_training_curves_step_{total_training_steps}.png: Training loss curves")
+    print(f"- ema_latent_space_step_{total_training_steps}.png: Latent space visualization")
+    print(f"- ema_codebook_usage_step_{total_training_steps}.png: Codebook usage")

@@ -16,9 +16,9 @@ def compute_codebook_usage(all_indices, num_embeddings):
     unique_codes = len(np.unique(all_indices))
     return unique_codes / num_embeddings
 
-def visualize_reconstructions(data, recon):
+def visualize_reconstructions(data, recon, filename="fig_reconstructions"):
     """Visualize reconstruction comparison"""
-    print("\nGenerating reconstruction comparison...")
+    print(f"\nGenerating reconstruction comparison: {filename}.png")
     # un-normalize: (img * 0.5) + 0.5
     originals = (data.cpu() * 0.5 + 0.5).clamp(0, 1)
     recon = (recon.cpu() * 0.5 + 0.5).clamp(0, 1)
@@ -33,8 +33,8 @@ def visualize_reconstructions(data, recon):
     plt.yticks([32*0.5, 32*1.0], ["Original", "Maodie (Ours)"], rotation=90, va='center', fontsize=12)
     plt.xticks([])
     plt.tight_layout()
-    plt.savefig("fig_reconstructions.png")
-    print("Saved 'fig_reconstructions.png'")
+    plt.savefig(f"{filename}.png")
+    print(f"Saved '{filename}.png'")
 
 
 def evaluate(model, test_loader, device):
