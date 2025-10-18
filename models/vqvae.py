@@ -12,7 +12,7 @@ from models.DirDisc import Discriminator
 
 class MaodieVQ(nn.Module):
     def __init__(self, h_dim, res_h_dim, n_res_layers,
-                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False):
+                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False, use_fisher=False):
         super(MaodieVQ, self).__init__()
         # encode image into continuous latent space
         self.encoder = Encoder(3, h_dim, n_res_layers, res_h_dim)
@@ -29,10 +29,14 @@ class MaodieVQ(nn.Module):
         self.patch_size = patch_size
         alpha = torch.full((n_embeddings,), dirichlet_alpha)
         self.dist = torch.distributions.Dirichlet(alpha)
+        self.use_fisher = use_fisher
+
         if save_img_embedding_map:
             self.img_to_embedding_map = {i: [] for i in range(n_embeddings)}
         else:
             self.img_to_embedding_map = None
+        if use_fisher:
+            self.register_buffer('lambda_param', torch.zeros(1,))
         
     def forward(self, x, verbose=False, return_loss=False):
         """
@@ -92,26 +96,55 @@ class MaodieVQ(nn.Module):
     def training_step(self, x, optimizer_G, optimizer_D, lambda_adv=1e-4):
         """执行一步对抗训练"""
         self.train()
-        batch_size = x.size(0)
+        # Zero gradients
         optimizer_D.zero_grad()
         optimizer_G.zero_grad()
-        loss_G, recon_loss, vq_loss, perplexity, p_fake, _ = self(x, return_loss=True)
-        # === 更新判别器 ===
+        total_loss, recon_loss, vq_loss, perplexity, p_fake = self(x)
+        
+        # Update discriminator
         self.discriminator.requires_grad_(True)
-        p_real = self.sample_dirichlet_prior(batch_size)
-        D_real = self.discriminator(p_real) 
+        
+        # 生成真实样本（先验）
+        p_real = self.sample_dirichlet_prior(p_fake.size(0))
+        p_real = p_real.to(p_fake.dtype)
+        D_real = self.discriminator(p_real)
         D_fake = self.discriminator(p_fake.detach())
-        loss_D_real = -torch.log(torch.sigmoid(D_real) + 1e-8).mean()
-        loss_D_fake = -torch.log(1 - torch.sigmoid(D_fake) + 1e-8).mean()
-        loss_D = loss_D_real + loss_D_fake
+        if self.use_fisher:
+            # 二阶矩约束项 Omega(f) = 0.5 * E[f(real)^2] + 0.5 * E[f(fake)^2]
+            mean_diff = torch.mean(D_real) - torch.mean(D_fake)
+            omega = 0.5 * (torch.mean(D_real**2) + torch.mean(D_fake**2))
+            # 约束违反度 g(λ) = 1 - Omega(f)
+            constraint_violation = 1.0 - omega
+            # 增广拉格朗日损失函数
+            # L_D = -E(f) - λ * g(λ) + (ρ/2) * g(λ)^2
+            loss_D = -mean_diff - self.lambda_param * constraint_violation + (rho / 2.0) * (constraint_violation**2)
+             # --- 手动更新拉格朗日乘子 lambda ---
+            # λ ← λ + ρ * g(λ)
+            self.lambda_param += rho * constraint_violation.detach()
+
+        else:
+            # 标准判别器损失
+            loss_D_real = -torch.log(torch.sigmoid(D_real) + 1e-8).mean()
+            loss_D_fake = -torch.log(1 - torch.sigmoid(D_fake) + 1e-8).mean()
+            loss_D = loss_D_real + loss_D_fake
+            
+        # 更新判别器参数
         loss_D.backward()
         optimizer_D.step()
-        # === 更新生成器 ===
+    
+        # Update generator
         self.discriminator.requires_grad_(False)
-        D_fake = self.discriminator(p_fake)             
-        loss_adv = -torch.log(torch.sigmoid(D_fake) + 1e-8).mean()
-        loss_G += lambda_adv * loss_adv
-        loss_G.backward()
+        D_fake = self.discriminator(p_fake)
+        
+        if self.use_fisher:
+            loss_adv = -torch.mean(D_fake)
+
+        else:
+            loss_adv = -torch.log(torch.sigmoid(D_fake) + 1e-8).mean()
+
+        # Recompute generator loss
+        total_loss_G =  total_loss + self.lambda_adv * loss_adv
+        total_loss_G.backward()
         optimizer_G.step()
         
         return recon_loss.item(), vq_loss.item(), loss_D.item(), perplexity.item()
