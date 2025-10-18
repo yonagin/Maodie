@@ -99,7 +99,7 @@ class MaodieVQ(nn.Module):
             self.dirichlet_dist = torch.distributions.Dirichlet(alpha)
         
         # 从缓存的分布中采样
-        samples = self.dirichlet_dist.sample((batch_size,))
+        samples = self._dirichlet_dist.sample((batch_size,))
         return samples
         
     def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6, lambda_adv=1e-4):
@@ -129,7 +129,7 @@ class MaodieVQ(nn.Module):
             loss_D = -mean_diff - self.lambda_param * constraint_violation + (rho / 2.0) * (constraint_violation**2)
              # --- 手动更新拉格朗日乘子 lambda ---
             # λ ← λ + ρ * g(λ)
-            self.lambda_param += rho * constraint_violation.detach()
+            self.lambda_param = self.lambda_param + rho * constraint_violation.detach()
 
         else:
             # 标准判别器损失
