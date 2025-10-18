@@ -99,7 +99,7 @@ class MaodieVQ(nn.Module):
         # Zero gradients
         optimizer_D.zero_grad()
         optimizer_G.zero_grad()
-        total_loss, recon_loss, vq_loss, perplexity, p_fake = self(x)
+        total_loss, recon_loss, vq_loss, perplexity, p_fake = self(x,return_loss=True)
         
         # Update discriminator
         self.discriminator.requires_grad_(True)
@@ -135,7 +135,7 @@ class MaodieVQ(nn.Module):
         # Update generator
         self.discriminator.requires_grad_(False)
         D_fake = self.discriminator(p_fake)
-        
+
         if self.use_fisher:
             loss_adv = -torch.mean(D_fake)
 
