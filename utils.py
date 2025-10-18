@@ -16,9 +16,9 @@ def compute_psnr(mse):
         return 100
     return 10 * np.log10(255.0 * 255.0 / mse)
 
-def compute_codebook_usage(all_indices, num_embeddings):
+def compute_codebook_usage(all_indices, n_embeddings):
     unique_codes = len(np.unique(all_indices))
-    return unique_codes / num_embeddings
+    return unique_codes / n_embeddings
 
 def visualize_reconstructions(data, recon, filename="fig_reconstructions"):
     """Visualize reconstruction comparison"""
@@ -65,7 +65,7 @@ def evaluate(model, test_loader, device):
             
     avg_mse = total_mse / (len(test_loader.dataset) * 3 * 32 * 32)
     psnr = compute_psnr(avg_mse)
-    codebook_usage = compute_codebook_usage(np.concatenate(all_indices), model.vq.num_embeddings)
+    codebook_usage = compute_codebook_usage(np.concatenate(all_indices), model.vq.n_embeddings)
     
     return {'psnr': psnr, 'mse': avg_mse, 'codebook_usage': codebook_usage}
 
@@ -141,12 +141,12 @@ def visualize_codebook_usage(model, data_loader, device, title, filename):
             all_indices.append(indices.cpu().numpy())
             
     all_indices = np.concatenate(all_indices)
-    counts = np.bincount(all_indices, minlength=model.vq.num_embeddings)
+    counts = np.bincount(all_indices, minlength=model.vq.n_embeddings)
     
-    usage_rate = compute_codebook_usage(all_indices, model.vq.num_embeddings)
+    usage_rate = compute_codebook_usage(all_indices, model.vq.n_embeddings)
     
     fig = plt.figure(figsize=(10, 5))
-    plt.bar(range(model.vq.num_embeddings), counts, width=1.0)
+    plt.bar(range(model.vq.n_embeddings), counts, width=1.0)
     plt.title(f"Codebook Usage: {title} (Usage: {usage_rate:.2%})", fontsize=14)
     plt.xlabel("Codebook Index")
     plt.ylabel("Frequency")
