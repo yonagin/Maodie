@@ -7,7 +7,7 @@ import numpy as np
 from models.encoder import Encoder
 from models.quantizer import VectorQuantizer, EMAVectorQuantizer
 from models.decoder import Decoder
-from models.DirDisc import Discriminator
+from models.DirDisc import Discriminator, FisherDiscriminator
 
 
 class MaodieVQ(nn.Module):
@@ -23,7 +23,6 @@ class MaodieVQ(nn.Module):
             n_embeddings, embedding_dim, beta)
         # decode the discrete latent representation
         self.decoder = Decoder(embedding_dim, h_dim, n_res_layers, res_h_dim)
-        self.discriminator = Discriminator(n_embeddings)
 
         self.temperature = temperature
         self.patch_size = patch_size
@@ -36,6 +35,9 @@ class MaodieVQ(nn.Module):
             self.img_to_embedding_map = None
         if use_fisher:
             self.register_buffer('lambda_param', torch.zeros(1,))
+            self.discriminator = FisherDiscriminator(n_embeddings)
+        else:
+            self.discriminator = Discriminator(n_embeddings)
         
         self.dirichlet_dist = None
 
