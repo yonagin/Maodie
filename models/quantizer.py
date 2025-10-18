@@ -4,15 +4,15 @@ import torch.nn.functional as F
 
 
 class VectorQuantizer(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, commitment_cost=0.25):
+    def __init__(self, n_embeddings, embedding_dim, commitment_cost=0.25):
         super().__init__()
-        self.num_embeddings = num_embeddings
+        self.n_embeddings = n_embeddings
         self.embedding_dim = embedding_dim
         self.commitment_cost = commitment_cost
         
         # 码本
-        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
-        self.embedding.weight.data.uniform_(-1/num_embeddings, 1/num_embeddings)
+        self.embedding = nn.Embedding(n_embeddings, embedding_dim)
+        self.embedding.weight.data.uniform_(-1/n_embeddings, 1/n_embeddings)
         
     def forward(self, z_e):
         """
@@ -45,7 +45,7 @@ class VectorQuantizer(nn.Module):
         z_q = z_q.permute(0, 3, 1, 2).contiguous()
         
         # 困惑度（衡量码本使用多样性）
-        encodings = F.one_hot(encoding_indices, self.num_embeddings).float()
+        encodings = F.one_hot(encoding_indices, self.n_embeddings).float()
         avg_probs = torch.mean(encodings, dim=0)
         perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
         
@@ -53,20 +53,20 @@ class VectorQuantizer(nn.Module):
 
 
 class EMAVectorQuantizer(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, beta=0.25, decay=0.99, eps=1e-5):
+    def __init__(self, n_embeddings, embedding_dim, beta=0.25, decay=0.99, eps=1e-5):
         super().__init__()
-        self.num_embeddings = num_embeddings
+        self.n_embeddings = n_embeddings
         self.embedding_dim = embedding_dim
         self.beta = beta
         self.decay = decay
         self.eps = eps
         
         # 码本
-        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
-        self.embedding.weight.data.uniform_(-1/num_embeddings, 1/num_embeddings)
+        self.embedding = nn.Embedding(n_embeddings, embedding_dim)
+        self.embedding.weight.data.uniform_(-1/n_embeddings, 1/n_embeddings)
         
         # EMA参数
-        self.register_buffer('cluster_size', torch.zeros(num_embeddings))
+        self.register_buffer('cluster_size', torch.zeros(n_embeddings))
         self.register_buffer('embed_avg', self.embedding.weight.data.clone())
         
     def forward(self, z_e):
@@ -85,7 +85,7 @@ class EMAVectorQuantizer(nn.Module):
         
         # 硬量化
         encoding_indices = torch.argmin(distances, dim=1)
-        encodings = F.one_hot(encoding_indices, self.num_embeddings).float()
+        encodings = F.one_hot(encoding_indices, self.n_embeddings).float()
         
         # 查表 
         z_q = self.embedding(encoding_indices).view(z_e_permuted.shape)
@@ -102,7 +102,7 @@ class EMAVectorQuantizer(nn.Module):
             
             # 更新码本权重
             n = self.cluster_size.sum()
-            smoothed_cluster_size = ((self.cluster_size + self.eps) / (n + self.num_embeddings * self.eps)) * n
+            smoothed_cluster_size = ((self.cluster_size + self.eps) / (n + self.n_embeddings * self.eps)) * n
             embed_normalized = self.embed_avg / smoothed_cluster_size.unsqueeze(1)
             self.embedding.weight.data.copy_(embed_normalized)
         
