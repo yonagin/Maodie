@@ -37,8 +37,7 @@ class MaodieVQ(nn.Module):
         if use_fisher:
             self.register_buffer('lambda_param', torch.zeros(1,))
         
-        # 缓存Dirichlet分布对象
-        self._dirichlet_dist = None
+        self.dirichlet_dist = None
 
     def forward(self, x, verbose=False, return_loss=False):
         """
@@ -95,9 +94,9 @@ class MaodieVQ(nn.Module):
         device = next(self.parameters()).device
         
         # 如果缓存不存在或设备不匹配，创建新的Dirichlet分布
-        if not hasattr(self, '_dirichlet_dist'):
+        if self.dirichlet_dist is None or self.dirichlet_dist.concentration.device != device:
             alpha = torch.full((self.vq.n_embeddings,), self.dirichlet_alpha, device=device)
-            self._dirichlet_dist = torch.distributions.Dirichlet(alpha)
+            self.dirichlet_dist = torch.distributions.Dirichlet(alpha)
         
         # 从缓存的分布中采样
         samples = self._dirichlet_dist.sample((batch_size,))
