@@ -99,7 +99,7 @@ class MaodieVQ(nn.Module):
             self.dirichlet_dist = torch.distributions.Dirichlet(alpha)
         
         # 从缓存的分布中采样
-        samples = self._dirichlet_dist.sample((batch_size,))
+        samples = self.dirichlet_dist.sample((batch_size,))
         return samples
         
     def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6, lambda_adv=1e-4):
