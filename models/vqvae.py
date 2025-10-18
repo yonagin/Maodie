@@ -103,7 +103,7 @@ class MaodieVQ(nn.Module):
         samples = self._dirichlet_dist.sample((batch_size,))
         return samples
         
-    def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6):
+    def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6, lambda_adv=1e-4):
         """执行一步对抗训练"""
         self.train()
         # Zero gradients
@@ -153,7 +153,7 @@ class MaodieVQ(nn.Module):
             loss_adv = -torch.log(torch.sigmoid(D_fake) + 1e-8).mean()
 
         # Recompute generator loss
-        total_loss_G =  total_loss + self.lambda_adv * loss_adv
+        total_loss_G =  total_loss + lambda_adv * loss_adv
         total_loss_G.backward()
         optimizer_G.step()
         
