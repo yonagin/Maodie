@@ -64,7 +64,7 @@ class MaodieVQ(nn.Module):
             p = self.get_p(z_q, distances)
             recon_loss = F.mse_loss(x_hat, x)
             total_loss = recon_loss + embedding_loss
-            return total_loss, recon_loss, embedding_loss, perplexity, p, x_hat
+            return total_loss, recon_loss, embedding_loss, perplexity, p
         else:
             return embedding_loss, x_hat, perplexity
 
