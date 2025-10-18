@@ -27,8 +27,7 @@ class MaodieVQ(nn.Module):
 
         self.temperature = temperature
         self.patch_size = patch_size
-        alpha = torch.full((n_embeddings,), dirichlet_alpha)
-        self.dist = torch.distributions.Dirichlet(alpha)
+        self.dirichlet_alpha = dirichlet_alpha
         self.use_fisher = use_fisher
 
         if save_img_embedding_map:
@@ -38,6 +37,9 @@ class MaodieVQ(nn.Module):
         if use_fisher:
             self.register_buffer('lambda_param', torch.zeros(1,))
         
+        # 缓存Dirichlet分布对象
+        self._dirichlet_dist = None
+
     def forward(self, x, verbose=False, return_loss=False):
         """
         Forward pass with optional loss computation
@@ -90,10 +92,18 @@ class MaodieVQ(nn.Module):
 
     def sample_dirichlet_prior(self, batch_size):
         """从Dirichlet(alpha, ..., alpha)采样"""
-        samples = self.dist.sample((batch_size,))
-        return samples.to(next(self.parameters()).device)
+        device = next(self.parameters()).device
         
-    def training_step(self, x, optimizer_G, optimizer_D, lambda_adv=1e-4):
+        # 如果缓存不存在或设备不匹配，创建新的Dirichlet分布
+        if not hasattr(self, '_dirichlet_dist') or self._dirichlet_dist.concentration.device != device:
+            alpha = torch.full((self.vq.n_embeddings,), self.dirichlet_alpha, device=device)
+            self._dirichlet_dist = torch.distributions.Dirichlet(alpha)
+        
+        # 从缓存的分布中采样
+        samples = self._dirichlet_dist.sample((batch_size,))
+        return samples
+        
+    def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6):
         """执行一步对抗训练"""
         self.train()
         # Zero gradients
