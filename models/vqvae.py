@@ -95,7 +95,7 @@ class MaodieVQ(nn.Module):
         device = next(self.parameters()).device
         
         # 如果缓存不存在或设备不匹配，创建新的Dirichlet分布
-        if not hasattr(self, '_dirichlet_dist') or self._dirichlet_dist.concentration.device != device:
+        if not hasattr(self, '_dirichlet_dist'):
             alpha = torch.full((self.vq.n_embeddings,), self.dirichlet_alpha, device=device)
             self._dirichlet_dist = torch.distributions.Dirichlet(alpha)
         
