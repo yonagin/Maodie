@@ -12,7 +12,7 @@ from models.DirDisc import Discriminator, FisherDiscriminator
 
 class MaodieVQ(nn.Module):
     def __init__(self, h_dim, res_h_dim, n_res_layers,
-                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False, use_fisher=False):
+                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False, use_fisher=False, use_wgangp=False, lambda_gp=10.0):
         super(MaodieVQ, self).__init__()
         # encode image into continuous latent space
         self.encoder = Encoder(3, h_dim, n_res_layers, res_h_dim)
@@ -28,14 +28,20 @@ class MaodieVQ(nn.Module):
         self.patch_size = patch_size
         self.dirichlet_alpha = dirichlet_alpha
         self.use_fisher = use_fisher
+        self.use_wgangp = use_wgangp
+        self.lambda_gp = lambda_gp
 
         if save_img_embedding_map:
             self.img_to_embedding_map = {i: [] for i in range(n_embeddings)}
         else:
             self.img_to_embedding_map = None
+        
+        # 根据训练模式选择判别器类型
         if use_fisher:
             self.register_buffer('lambda_param', torch.zeros(1,))
             self.discriminator = FisherDiscriminator(n_embeddings)
+        elif use_wgangp:
+            self.discriminator = Discriminator(n_embeddings)
         else:
             self.discriminator = Discriminator(n_embeddings)
         
@@ -103,6 +109,37 @@ class MaodieVQ(nn.Module):
         # 从缓存的分布中采样
         samples = self.dirichlet_dist.sample((batch_size,))
         return samples
+    
+    def compute_gradient_penalty(self, p_real, p_fake):
+        """计算WGAN-GP的梯度惩罚项"""
+        batch_size = p_real.size(0)
+        
+        # 生成插值样本
+        alpha = torch.rand(batch_size, 1, device=p_real.device)
+        alpha = alpha.expand_as(p_real)
+        p_interpolated = alpha * p_real + (1 - alpha) * p_fake
+        p_interpolated.requires_grad_(True)
+        
+        # 计算判别器在插值样本上的输出
+        d_interpolated = self.discriminator(p_interpolated)
+        
+        # 计算梯度
+        gradients = torch.autograd.grad(
+            outputs=d_interpolated,
+            inputs=p_interpolated,
+            grad_outputs=torch.ones_like(d_interpolated),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True
+        )[0]
+        
+        # 计算梯度范数
+        gradients_norm = gradients.view(batch_size, -1).norm(2, dim=1)
+        
+        # 计算梯度惩罚项
+        gradient_penalty = ((gradients_norm - 1) ** 2).mean()
+        
+        return gradient_penalty
         
     def training_step(self, x, optimizer_G, optimizer_D, rho=1e-6, lambda_adv=1e-4):
         """执行一步对抗训练"""
@@ -120,6 +157,7 @@ class MaodieVQ(nn.Module):
         p_real = p_real.to(p_fake.dtype)
         D_real = self.discriminator(p_real)
         D_fake = self.discriminator(p_fake.detach())
+        
         if self.use_fisher:
             # 二阶矩约束项 Omega(f) = 0.5 * E[f(real)^2] + 0.5 * E[f(fake)^2]
             mean_diff = torch.mean(D_real) - torch.mean(D_fake)
@@ -132,6 +170,14 @@ class MaodieVQ(nn.Module):
              # --- 手动更新拉格朗日乘子 lambda ---
             # λ ← λ + ρ * g(λ)
             self.lambda_param = self.lambda_param + rho * constraint_violation.detach()
+
+        elif self.use_wgangp:
+            # WGAN-GP判别器损失
+            loss_D = torch.mean(D_fake) - torch.mean(D_real)
+            
+            # 计算梯度惩罚项
+            gradient_penalty = self.compute_gradient_penalty(p_real, p_fake.detach())
+            loss_D = loss_D + self.lambda_gp * gradient_penalty
 
         else:
             # 标准判别器损失
@@ -147,9 +193,8 @@ class MaodieVQ(nn.Module):
         self.discriminator.requires_grad_(False)
         D_fake = self.discriminator(p_fake)
 
-        if self.use_fisher:
+        if self.use_fisher or self.use_wgangp:
             loss_adv = -torch.mean(D_fake)
-
         else:
             loss_adv = -torch.log(torch.sigmoid(D_fake) + 1e-8).mean()
 
