@@ -50,8 +50,8 @@ class VectorQuantizer(nn.Module):
         
         # 损失计算 - 根据cosine参数选择不同的损失函数
         if self.cosine:
-            z_norm = F.normalize(z, p=2, dim=-1)
-            e_norm = F.normalize(e, p=2, dim=-1)
+            z_norm = F.normalize(z_q, p=2, dim=-1)
+            e_norm = F.normalize(z_e_permuted, p=2, dim=-1)
 
             # 1. 码本损失 (Codebook Loss)
             # 目标：更新码本 e，使其方向接近 z
