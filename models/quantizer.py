@@ -1,15 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
-def rearrange(tensor, pattern):
-    """简单的rearrange函数实现，用于替代einops.rearrange"""
-    if pattern == 'n d -> d n':
-        return tensor.t()
-    else:
-        raise ValueError(f"Unsupported pattern: {pattern}")
-
+from einops import rearrange
 
 class VectorQuantizer(nn.Module):
     def __init__(self, n_embeddings, embedding_dim, commitment_cost=0.25):
