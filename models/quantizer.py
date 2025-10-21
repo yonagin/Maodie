@@ -48,10 +48,27 @@ class VectorQuantizer(nn.Module):
         z_q_flat = self.embedding(encoding_indices)
         z_q = z_q_flat.view(z_e_permuted.shape)
         
-        # 损失
-        e_latent_loss = F.mse_loss(z_q.detach(), z_e_permuted)
-        q_latent_loss = F.mse_loss(z_q, z_e_permuted.detach())
-        loss = q_latent_loss + self.commitment_cost * e_latent_loss
+        # 损失计算 - 根据cosine参数选择不同的损失函数
+        if self.cosine:
+            z_norm = F.normalize(z, p=2, dim=-1)
+            e_norm = F.normalize(e, p=2, dim=-1)
+
+            # 1. 码本损失 (Codebook Loss)
+            # 目标：更新码本 e，使其方向接近 z
+            # 操作：在 z 上停止梯度
+            codebook_loss = torch.mean(1.0 - torch.sum(z_norm.detach() * e_norm, dim=-1))
+            # 梯度只会从 e_norm -> e，不会流向 z
+
+            # 2. 承诺损失 (Commitment Loss)
+            # 目标：更新编码器 z，使其方向接近 e
+            # 操作：在 e 上停止梯度
+            commitment_loss = torch.mean(1.0 - torch.sum(z_norm * e_norm.detach(), dim=-1))
+        else:
+            # 使用MSE损失
+            commitment_loss = F.mse_loss(z_q.detach(), z_e_permuted)
+            codebook_loss = F.mse_loss(z_q, z_e_permuted.detach())
+        
+        loss = codebook_loss + self.commitment_cost * commitment_loss
         
         # 直通估计器
         z_q = z_e_permuted + (z_q - z_e_permuted).detach()
@@ -105,9 +122,9 @@ class SimVQ(nn.Module):
         z_q = z_q_flat.view(z_e_permuted.shape)
         
         # 损失计算 
-        e_latent_loss = F.mse_loss(z_q.detach(), z_e_permuted)
-        q_latent_loss = F.mse_loss(z_q, z_e_permuted.detach())
-        loss = q_latent_loss + self.commitment_cost * e_latent_loss
+        commitment_loss = F.mse_loss(z_q.detach(), z_e_permuted)
+        codebook_loss = F.mse_loss(z_q, z_e_permuted.detach())
+        loss = codebook_loss + self.commitment_cost * commitment_loss
         
         # 直通估计器
         z_q = z_e_permuted + (z_q - z_e_permuted).detach()
