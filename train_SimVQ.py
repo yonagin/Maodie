@@ -12,7 +12,7 @@ from sklearn.manifold import TSNE
 from tqdm import tqdm
 
 # Import models and utility functions
-from models.vqvae import EMAVQ
+from models.vqvae import SimVQModel
 from utils import (
     compute_psnr, compute_codebook_usage, visualize_reconstructions,
     evaluate, visualize_latent_space, visualize_codebook_usage
@@ -57,33 +57,30 @@ def load_cifar100_dataset():
 
 
 def create_model():
-    """Create EMA model"""
-    print("Creating EMA VQ-VAE model...")
+    """Create SimVQ model"""
+    print("Creating SimVQ VQ-VAE model...")
     print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
-    print(f"EMA decay rate: {ema_decay}")
     print(f"Commitment cost: {commitment_cost}")
     
-    model = EMAVQ(
+    model = SimVQModel(
         h_dim=h_dim,
         res_h_dim=res_h_dim,
         n_res_layers=n_res_layers,
         n_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
-        beta=commitment_cost,
-        decay=ema_decay,
-        eps=ema_eps
+        commitment_cost=commitment_cost
     ).to(device)
     
     return model
 
 
 def setup_optimizer(model):
-    """Setup optimizer for EMA model"""
+    """Setup optimizer for SimVQ model"""
     optimizer = optim.Adam(
         list(model.encoder.parameters()) + 
         list(model.pre_quantization_conv.parameters()) +
-        list(model.vq.parameters()) + 
+        list(model.vq.embedding_proj.parameters()) +  # 包含SimVQ的投影层参数
         list(model.decoder.parameters()),
         lr=lr
     )
@@ -92,7 +89,7 @@ def setup_optimizer(model):
 
 
 def train_model(model, train_loader, test_loader):
-    """Train EMA model"""
+    """Train SimVQ model"""
     optimizer = setup_optimizer(model)
     
     # Training statistics
@@ -147,7 +144,7 @@ def train_model(model, train_loader, test_loader):
                     test_batch, _ = next(iter(test_loader))
                     test_batch = test_batch[:8].to(device)
                     recon_batch, _ = model.reconstruct(test_batch)
-                    visualize_reconstructions(test_batch, recon_batch, f"ema_reconstructions_step_{step}")
+                    visualize_reconstructions(test_batch, recon_batch, f"simvq_reconstructions_step_{step}")
             
             if step % 100 == 0:
                 print(f"Progress: {step}/{total_training_steps}", end="\r")
@@ -156,7 +153,7 @@ def train_model(model, train_loader, test_loader):
 
 
 def visualize_training_results(model, test_loader, train_losses, recon_losses, vq_losses, perplexities):
-    """Visualize training results for EMA model"""
+    """Visualize training results for SimVQ model"""
     print("\nGenerating training results visualization...")
     
     # Loss curves
@@ -164,49 +161,49 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     
     plt.subplot(2, 2, 1)
     plt.plot(train_losses)
-    plt.title(f"Total Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
+    plt.title(f"Total Loss Curve (SimVQ VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 2)
     plt.plot(recon_losses)
-    plt.title(f"Reconstruction Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
+    plt.title(f"Reconstruction Loss Curve (SimVQ VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Reconstruction Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 3)
     plt.plot(vq_losses)
-    plt.title(f"VQ Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
+    plt.title(f"VQ Loss Curve (SimVQ VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("VQ Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 4)
     plt.plot(perplexities)
-    plt.title(f"Perplexity Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
+    plt.title(f"Perplexity Curve (SimVQ VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Perplexity")
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(f"ema_training_curves_step_{total_training_steps}.png")
+    plt.savefig(f"simvq_training_curves_step_{total_training_steps}.png")
     plt.close(fig)  # 关闭图形释放内存
-    print(f"Saved training curves: ema_training_curves_step_{total_training_steps}.png")
+    print(f"Saved training curves: simvq_training_curves_step_{total_training_steps}.png")
     
     # Latent space visualization
     visualize_latent_space(
         model, test_loader, device, 
-        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
-        f"ema_latent_space_step_{total_training_steps}.png"
+        f"SimVQ VQ-VAE (Codebook Size: {num_embeddings})",
+        f"simvq_latent_space_step_{total_training_steps}.png"
     )
     
     # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
-        f"ema_codebook_usage_step_{total_training_steps}.png"
+        f"SimVQ VQ-VAE (Codebook Size: {num_embeddings})",
+        f"simvq_codebook_usage_step_{total_training_steps}.png"
     )
 
 
@@ -219,8 +216,6 @@ if __name__ == "__main__":
     num_embeddings = 8192
     embedding_dim = 32
     commitment_cost = 0.25
-    ema_decay = 0.99
-    ema_eps = 1e-5
 
     # Model parameters
     h_dim = 32
@@ -232,10 +227,10 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     
     """Main function"""
-    print("=== EMA VQ-VAE Training Script ===")
+    print("=== SimVQ VQ-VAE Training Script ===")
     print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
-    print(f"EMA decay rate: {ema_decay}")
+    print(f"Commitment cost: {commitment_cost}")
     print(f"Batch size: {batch_size}")
     print(f"Total training steps: {total_training_steps}")
     
@@ -265,12 +260,12 @@ if __name__ == "__main__":
     )
     
     # Save model
-    torch.save(model.state_dict(), f"ema_model_{num_embeddings}.pth")
-    print(f"Model saved: ema_model_{num_embeddings}.pth")
+    torch.save(model.state_dict(), f"simvq_model_{num_embeddings}.pth")
+    print(f"Model saved: simvq_model_{num_embeddings}.pth")
     
     print("\n=== Training Completed ===")
     print("Generated visualization files:")
-    print(f"- ema_reconstructions_step_*.png: Reconstruction comparisons at different steps")
-    print(f"- ema_training_curves_step_{total_training_steps}.png: Training loss curves")
-    print(f"- ema_latent_space_step_{total_training_steps}.png: Latent space visualization")
-    print(f"- ema_codebook_usage_step_{total_training_steps}.png: Codebook usage")
+    print(f"- simvq_reconstructions_step_*.png: Reconstruction comparisons at different steps")
+    print(f"- simvq_training_curves_step_{total_training_steps}.png: Training loss curves")
+    print(f"- simvq_latent_space_step_{total_training_steps}.png: Latent space visualization")
+    print(f"- simvq_codebook_usage_step_{total_training_steps}.png: Codebook usage")
