@@ -30,7 +30,7 @@ def load_cifar10_dataset():
     ])
     
     # Download training set
-    trainset = torchvision.datasets.CIFAR10(
+    trainset = torchvision.datasets.CIFAR100(
         root='./data', 
         train=True, 
         download=True, 
@@ -38,7 +38,7 @@ def load_cifar10_dataset():
     )
     
     # Download test set
-    testset = torchvision.datasets.CIFAR10(
+    testset = torchvision.datasets.CIFAR100(
         root='./data', 
         train=False, 
         download=True, 
@@ -59,7 +59,7 @@ def load_cifar10_dataset():
 def create_model():
     """Create EMA model"""
     print("Creating EMA VQ-VAE model...")
-    print(f"Codebook size: {n_embeddings}")
+    print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
     print(f"EMA decay rate: {ema_decay}")
     print(f"Commitment cost: {commitment_cost}")
@@ -68,7 +68,7 @@ def create_model():
         h_dim=h_dim,
         res_h_dim=res_h_dim,
         n_res_layers=n_res_layers,
-        n_embeddings=n_embeddings,
+        n_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
         beta=commitment_cost,
         decay=ema_decay,
@@ -164,28 +164,28 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     
     plt.subplot(2, 2, 1)
     plt.plot(train_losses)
-    plt.title(f"Total Loss Curve (EMA VQ-VAE, Codebook Size: {n_embeddings})")
+    plt.title(f"Total Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 2)
     plt.plot(recon_losses)
-    plt.title(f"Reconstruction Loss Curve (EMA VQ-VAE, Codebook Size: {n_embeddings})")
+    plt.title(f"Reconstruction Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Reconstruction Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 3)
     plt.plot(vq_losses)
-    plt.title(f"VQ Loss Curve (EMA VQ-VAE, Codebook Size: {n_embeddings})")
+    plt.title(f"VQ Loss Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("VQ Loss")
     plt.grid(True)
     
     plt.subplot(2, 2, 4)
     plt.plot(perplexities)
-    plt.title(f"Perplexity Curve (EMA VQ-VAE, Codebook Size: {n_embeddings})")
+    plt.title(f"Perplexity Curve (EMA VQ-VAE, Codebook Size: {num_embeddings})")
     plt.xlabel("Training Steps")
     plt.ylabel("Perplexity")
     plt.grid(True)
@@ -198,14 +198,14 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     # Latent space visualization
     visualize_latent_space(
         model, test_loader, device, 
-        f"EMA VQ-VAE (Codebook Size: {n_embeddings})",
+        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
         f"ema_latent_space_step_{total_training_steps}.png"
     )
     
     # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"EMA VQ-VAE (Codebook Size: {n_embeddings})",
+        f"EMA VQ-VAE (Codebook Size: {num_embeddings})",
         f"ema_codebook_usage_step_{total_training_steps}.png"
     )
 
@@ -213,17 +213,17 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
 if __name__ == "__main__":
     # Training parameters
     batch_size = 128
-    total_training_steps = 20000
+    total_training_steps = 50000
     eval_interval = 1000
     lr = 2e-4
-    n_embeddings = 1024
-    embedding_dim = 64
+    num_embeddings = 8192
+    embedding_dim = 32
     commitment_cost = 0.25
     ema_decay = 0.99
     ema_eps = 1e-5
 
     # Model parameters
-    h_dim = 64
+    h_dim = 32
     res_h_dim = 32
     n_res_layers = 2
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     
     """Main function"""
     print("=== EMA VQ-VAE Training Script ===")
-    print(f"Codebook size: {n_embeddings}")
+    print(f"Codebook size: {num_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
     print(f"EMA decay rate: {ema_decay}")
     print(f"Batch size: {batch_size}")
@@ -265,8 +265,8 @@ if __name__ == "__main__":
     )
     
     # Save model
-    torch.save(model.state_dict(), f"ema_model_{n_embeddings}.pth")
-    print(f"Model saved: ema_model_{n_embeddings}.pth")
+    torch.save(model.state_dict(), f"ema_model_{num_embeddings}.pth")
+    print(f"Model saved: ema_model_{num_embeddings}.pth")
     
     print("\n=== Training Completed ===")
     print("Generated visualization files:")

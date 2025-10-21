@@ -19,7 +19,7 @@ from utils import (
 )
 
 
-def load_cifar10_dataset():
+def load_cifar100_dataset():
     """Load CIFAR-10 dataset"""
     print("Loading CIFAR-10 dataset...")
     
@@ -30,7 +30,7 @@ def load_cifar10_dataset():
     ])
     
     # Download training set
-    trainset = torchvision.datasets.CIFAR10(
+    trainset = torchvision.datasets.CIFAR100(
         root='./data', 
         train=True, 
         download=True, 
@@ -38,7 +38,7 @@ def load_cifar10_dataset():
     )
     
     # Download test set
-    testset = torchvision.datasets.CIFAR10(
+    testset = torchvision.datasets.CIFAR100(
         root='./data', 
         train=False, 
         download=True, 
@@ -55,28 +55,6 @@ def load_cifar10_dataset():
     
     return train_loader, test_loader
 
-def create_model():
-    """Create Maodie model"""
-    print("Creating Maodie model...")
-    print(f"Codebook size: {n_embeddings}")
-    print(f"Embedding dimension: {embedding_dim}")
-    print(f"Adversarial weight: {lambda_adv}")
-    print(f"Temperature parameter: {temperature}")
-    print(f"Dirichlet parameter: {dirichlet_alpha}")
-    
-    model = MaodieVQ(
-        h_dim=h_dim,
-        res_h_dim=res_h_dim,
-        n_res_layers=n_res_layers,
-        n_embeddings=n_embeddings,
-        embedding_dim=embedding_dim,
-        beta=commitment_cost,
-        dirichlet_alpha=dirichlet_alpha,
-        temperature=temperature,
-        patch_size=patch_size,
-    ).to(device)
-    
-    return model
 
 def setup_optimizers(model):
     """Setup optimizers"""
@@ -220,29 +198,52 @@ def visualize_training_results(model, test_loader, train_losses, recon_losses, v
     # Codebook usage visualization
     visualize_codebook_usage(
         model, test_loader, device,
-        f"Maodie VQ(Codebook Size: {n_embeddings})",
+        f"Maodie VQ-VAE (Codebook Size: {n_embeddings})",
         f"maodie_codebook_usage_step_{total_training_steps}.png"
     )
 
-
+def create_model():
+    """Create Maodie model"""
+    print("Creating Maodie model...")
+    print(f"Codebook size: {n_embeddings}")
+    print(f"Embedding dimension: {embedding_dim}")
+    print(f"Adversarial weight: {lambda_adv}")
+    print(f"Temperature parameter: {temperature}")
+    print(f"Dirichlet parameter: {dirichlet_alpha}")
+    
+    model = MaodieVQ(
+        h_dim=h_dim,
+        res_h_dim=res_h_dim,
+        n_res_layers=n_res_layers,
+        n_embeddings=n_embeddings,
+        embedding_dim=embedding_dim,
+        beta=commitment_cost,
+        dirichlet_alpha=dirichlet_alpha,
+        temperature=temperature,
+        patch_size=patch_size,
+        use_fisher=fisher
+    ).to(device)
+    
+    return model
  
 
 if __name__ == "__main__":
     # Training parameters
     batch_size = 128
-    total_training_steps = 20000
+    total_training_steps = 50000
     eval_interval = 1000
     lr = 2e-4
-    n_embeddings = 1024
-    embedding_dim = 64
+    n_embeddings = 8192
+    embedding_dim = 32
     commitment_cost = 0.25
     lambda_adv = 1e-4
     temperature = 1.0
     dirichlet_alpha = 0.1
-    patch_size = 2
+    patch_size = 4
+    fisher = False
 
     # Model parameters
-    h_dim = 64
+    h_dim = 32
     res_h_dim = 32
     n_res_layers = 2
 
@@ -260,7 +261,7 @@ if __name__ == "__main__":
     os.makedirs("./results", exist_ok=True)
     
     # Load data
-    train_loader, test_loader = load_cifar10_dataset()
+    train_loader, test_loader = load_cifar100_dataset()
     
     # Create model
     model = create_model()
