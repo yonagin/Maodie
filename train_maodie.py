@@ -210,6 +210,7 @@ def create_model():
     print(f"Adversarial weight: {lambda_adv}")
     print(f"Temperature parameter: {temperature}")
     print(f"Dirichlet parameter: {dirichlet_alpha}")
+    print(f"Use cosine similarity: {cosine}")
     
     model = MaodieVQ(
         h_dim=h_dim,
@@ -221,7 +222,8 @@ def create_model():
         dirichlet_alpha=dirichlet_alpha,
         temperature=temperature,
         patch_size=patch_size,
-        use_fisher=fisher
+        use_fisher=fisher,
+        cosine=cosine
     ).to(device)
     
     return model
@@ -241,6 +243,7 @@ if __name__ == "__main__":
     dirichlet_alpha = 0.1
     patch_size = 4
     fisher = False
+    cosine = False  # 是否使用余弦相似度计算距离
 
     # Model parameters
     h_dim = 32

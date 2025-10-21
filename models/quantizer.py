@@ -4,11 +4,12 @@ import torch.nn.functional as F
 from einops import rearrange
 
 class VectorQuantizer(nn.Module):
-    def __init__(self, n_embeddings, embedding_dim, commitment_cost=0.25):
+    def __init__(self, n_embeddings, embedding_dim, commitment_cost=0.25, cosine=False):
         super().__init__()
         self.n_embeddings = n_embeddings
         self.embedding_dim = embedding_dim
         self.commitment_cost = commitment_cost
+        self.cosine = cosine
         
         # 码本
         self.embedding = nn.Embedding(n_embeddings, embedding_dim)
@@ -23,10 +24,22 @@ class VectorQuantizer(nn.Module):
         z_e_permuted = z_e.permute(0, 2, 3, 1).contiguous()
         flat_z_e = z_e_permuted.view(-1, self.embedding_dim)
         
-        # 计算距离: (B*H*W, K)
-        distances = (torch.sum(flat_z_e**2, dim=1, keepdim=True)
-                    + torch.sum(self.embedding.weight**2, dim=1)
-                    - 2 * torch.einsum('bd,dn->bn', flat_z_e, self.embedding.weight.t()))
+        # 根据cosine参数选择距离计算方式
+        if self.cosine:
+            # 余弦相似度计算距离
+            # 归一化输入向量和码本向量
+            flat_z_e_norm = F.normalize(flat_z_e, p=2, dim=1)
+            embedding_norm = F.normalize(self.embedding.weight, p=2, dim=1)
+            
+            # 计算余弦相似度: (B*H*W, K)
+            cosine_sim = torch.einsum('bd,dn->bn', flat_z_e_norm, embedding_norm.t())
+            # 转换为距离 (1 - 余弦相似度)
+            distances = 1.0 - cosine_sim
+        else:
+            # 原有的欧几里得距离计算
+            distances = (torch.sum(flat_z_e**2, dim=1, keepdim=True)
+                        + torch.sum(self.embedding.weight**2, dim=1)
+                        - 2 * torch.einsum('bd,dn->bn', flat_z_e, self.embedding.weight.t()))
         
         # 硬量化
         encoding_indices = torch.argmin(distances, dim=1)
