@@ -91,7 +91,7 @@ class SimVQ(nn.Module):
         z_q_flat = F.embedding(encoding_indices, quant_codebook)
         z_q = z_q_flat.view(z_e_permuted.shape)
         
-        # 损失计算 - 使用SimVQ的计算方式
+        # 损失计算 
         e_latent_loss = F.mse_loss(z_q.detach(), z_e_permuted)
         q_latent_loss = F.mse_loss(z_q, z_e_permuted.detach())
         loss = q_latent_loss + self.commitment_cost * e_latent_loss
