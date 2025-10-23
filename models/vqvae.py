@@ -43,7 +43,7 @@ class MaodieVQ(nn.Module):
         elif use_wgangp:
             self.discriminator = Discriminator(n_embeddings)
         else:
-            self.discriminator = Discriminator(n_embeddings)
+            self.discriminator = Discriminator()
         
         self.dirichlet_dist = None
 
