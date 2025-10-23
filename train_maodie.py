@@ -1,3 +1,5 @@
+%cd maodie
+
 import os
 import torch
 import torch.nn as nn
@@ -73,8 +75,28 @@ def setup_optimizers(model):
     
     return optimizer_G, optimizer_D
 
+def reset_discriminator(model, optimizer_D, lr):
+    """重置判别器参数和优化器"""
+    print("\n[INFO]resetting discriminator...")
+    
+    # 重新初始化判别器参数
+    for layer in model.discriminator.modules():
+        if isinstance(layer, (nn.Conv2d, nn.Linear)):
+            nn.init.normal_(layer.weight, 0.0, 0.02)
+            if layer.bias is not None:
+                nn.init.constant_(layer.bias, 0)
+    
+    # 重置优化器
+    optimizer_D = optim.Adam(
+        model.discriminator.parameters(),
+        lr=lr
+    )
+    
+    return optimizer_D
+
+
 def train_model(model, train_loader, test_loader):
-    """Train model"""
+    """Train model with discriminator reset strategy"""
     optimizer_G, optimizer_D = setup_optimizers(model)
     
     # Training statistics
@@ -84,7 +106,14 @@ def train_model(model, train_loader, test_loader):
     disc_losses = []
     perplexities = []
     
+    # Discriminator reset tracking
+    disc_reset_threshold = 1e-4
+    disc_reset_window = 500  # 检查最近100步的平均损失
+    disc_reset_count = 0
+    
     print("Starting training...")
+    print(f"Discriminator reset threshold: {disc_reset_threshold}")
+    print(f"Discriminator reset window: {disc_reset_window} steps")
     
     step = 0
     while step < total_training_steps:
@@ -108,6 +137,17 @@ def train_model(model, train_loader, test_loader):
             disc_losses.append(disc_loss)
             perplexities.append(perplexity)
             step += 1
+            
+            # Check discriminator loss and reset if needed
+            if step > disc_reset_window and step % disc_reset_window == 0:
+                recent_disc_loss = np.mean(disc_losses[-disc_reset_window:])
+                
+                if recent_disc_loss < disc_reset_threshold:
+                    print(f"\n[Step {step}] Recent avg discriminator loss: {recent_disc_loss:.6f}")
+                    optimizer_D = reset_discriminator(model, optimizer_D, lr)
+                    disc_reset_count += 1
+                    print(f"Discriminator has been reset {disc_reset_count} times")
+            
             # Periodic evaluation
             if step % eval_interval == 0:
                 # Calculate average of recent eval_interval steps
@@ -122,6 +162,7 @@ def train_model(model, train_loader, test_loader):
                 print(f"VQ loss: {recent_vq_loss:.4f}")
                 print(f"Discriminator loss: {recent_disc_loss:.4f}")
                 print(f"Perplexity: {recent_perplexity:.2f}")
+                print(f"Discriminator resets: {disc_reset_count}")
                 
                 # Evaluate model
                 eval_results = evaluate(model, test_loader, device)
@@ -137,8 +178,9 @@ def train_model(model, train_loader, test_loader):
                     visualize_reconstructions(test_batch, recon_batch, f"maodie_reconstructions_step_{step}")
             
             if step % 100 == 0:
-                print(f"Progress: {step}/{total_training_steps}", end="\r")
+                print(f"Progress: {step}/{total_training_steps} | D-resets: {disc_reset_count}", end="\r")
     
+    print(f"\n\nTraining completed with {disc_reset_count} discriminator resets")
     return train_losses, recon_losses, vq_losses, disc_losses, perplexities
 
 def visualize_training_results(model, test_loader, train_losses, recon_losses, vq_losses, disc_losses, perplexities):
@@ -253,7 +295,7 @@ if __name__ == "__main__":
     # Device setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    """Main function"""
+    
     print("=== Maodie VQ-VAE Training Script ===")
     print(f"Codebook size: {n_embeddings}")
     print(f"Embedding dimension: {embedding_dim}")
@@ -268,7 +310,7 @@ if __name__ == "__main__":
     
     # Create model
     model = create_model()
-    
+
     # Train model
     train_losses, recon_losses, vq_losses, disc_losses, perplexities = train_model(
         model, train_loader, test_loader

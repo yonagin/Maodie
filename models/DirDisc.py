@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
 
-class Discriminator(torch.nn.Module):
+class Discriminator_(torch.nn.Module):
     def __init__(self, num_embeddings):
         super().__init__()
         self.net = torch.nn.Sequential(
@@ -17,6 +17,56 @@ class Discriminator(torch.nn.Module):
     def forward(self, p):
         """p: (B, K) 概率向量"""
         return self.net(p).squeeze(-1)
+
+class FisherDiscriminator(torch.nn.Module):
+    def __init__(self, num_embeddings):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            spectral_norm(nn.Linear(num_embeddings, 256)),
+            nn.LeakyReLU(0.2, True),
+            spectral_norm(nn.Linear(256, 128)),
+            nn.LeakyReLU(0.2, True),
+            spectral_norm(nn.Linear(128, 1)),
+        )
+        
+    def forward(self, p):
+        """p: (B, K) 概率向量"""
+        return self.net(p).squeeze(-1)
+
+class RandomProjectionDiscriminator(nn.Module):
+    def __init__(self, num_embeddings, projection_dim=256):
+        """
+        num_embeddings (K): 原始高维空间维度
+        projection_dim (D): 投影后的低维空间维度
+        """
+        super().__init__()
+        
+        # 1. 创建投影层
+        self.projection = nn.Linear(num_embeddings, projection_dim, bias=False)
+        
+        # 2. 特殊初始化 (例如，标准正态分布)
+        # 这里的初始化方法可以根据理论选择，标准正态分布是常用的一种
+        nn.init.normal_(self.projection.weight, mean=0, std=1/torch.sqrt(torch.tensor(projection_dim)))
+        
+        # 3. 冻结参数，使其不参与训练
+        self.projection.weight.requires_grad = False
+        
+        # 4. 后续的可训练判别器网络
+        self.net = nn.Sequential(
+            nn.Linear(projection_dim, 256),
+            nn.LeakyReLU(0.2, True),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.2, True),
+            nn.Linear(128, 1),
+        )
+        
+    def forward(self, p):
+        """p: (B, K) 概率向量，可以是稀疏或稠密的"""
+        # 使用冻结的投影矩阵进行降维
+        projected_p = self.projection(p) # (B, D)
+        
+        # 将降维后的稠密向量送入后续网络
+        return self.net(projected_p).squeeze(-1)
 
 def extract_lightweight_features(x: torch.Tensor, eps: float = 1e-20) -> torch.Tensor:
     """
@@ -82,9 +132,9 @@ def extract_lightweight_features(x: torch.Tensor, eps: float = 1e-20) -> torch.T
     return features
 
 
-class StatisticalDiscriminator(nn.Module):
+class Discriminator(nn.Module):
     def __init__(self, num_features=9, hidden_dim=64):
-        super(StatisticalDiscriminator, self).__init__()
+        super(Discriminator, self).__init__()
         # 带批归一化的MLP，以应对不同特征的尺度问题
         self.mlp = nn.Sequential(
             nn.Linear(num_features, hidden_dim),
@@ -102,41 +152,6 @@ class StatisticalDiscriminator(nn.Module):
         # 2. 送入小型MLP
         output = self.mlp(statistical_features)
         return output
-
-class RandomProjectionDiscriminator(nn.Module):
-    def __init__(self, num_embeddings, projection_dim=256):
-        """
-        num_embeddings (K): 原始高维空间维度
-        projection_dim (D): 投影后的低维空间维度
-        """
-        super().__init__()
-        
-        # 1. 创建投影层
-        self.projection = nn.Linear(num_embeddings, projection_dim, bias=False)
-        
-        # 2. 特殊初始化 (例如，标准正态分布)
-        # 这里的初始化方法可以根据理论选择，标准正态分布是常用的一种
-        nn.init.normal_(self.projection.weight, mean=0, std=1/torch.sqrt(torch.tensor(projection_dim)))
-        
-        # 3. 冻结参数，使其不参与训练
-        self.projection.weight.requires_grad = False
-        
-        # 4. 后续的可训练判别器网络
-        self.net = nn.Sequential(
-            nn.Linear(projection_dim, 256),
-            nn.LeakyReLU(0.2, True),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(0.2, True),
-            nn.Linear(128, 1),
-        )
-        
-    def forward(self, p):
-        """p: (B, K) 概率向量，可以是稀疏或稠密的"""
-        # 使用冻结的投影矩阵进行降维
-        projected_p = self.projection(p) # (B, D)
-        
-        # 将降维后的稠密向量送入后续网络
-        return self.net(projected_p).squeeze(-1)
 
 
 class CNNDiscriminator(nn.Module):
@@ -163,17 +178,3 @@ class CNNDiscriminator(nn.Module):
         return self.net(p).squeeze(-1)
 
 
-class FisherDiscriminator(torch.nn.Module):
-    def __init__(self, num_embeddings):
-        super().__init__()
-        self.net = torch.nn.Sequential(
-            spectral_norm(nn.Linear(num_embeddings, 256)),
-            nn.LeakyReLU(0.2, True),
-            spectral_norm(nn.Linear(256, 128)),
-            nn.LeakyReLU(0.2, True),
-            spectral_norm(nn.Linear(128, 1)),
-        )
-        
-    def forward(self, p):
-        """p: (B, K) 概率向量"""
-        return self.net(p).squeeze(-1)
