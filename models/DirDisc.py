@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
 
-class Discriminator_(torch.nn.Module):
+class Discriminator(torch.nn.Module):
     def __init__(self, num_embeddings):
         super().__init__()
         self.net = torch.nn.Sequential(
@@ -132,9 +132,9 @@ def extract_lightweight_features(x: torch.Tensor, eps: float = 1e-20) -> torch.T
     return features
 
 
-class Discriminator(nn.Module):
+class StatisticalDiscriminator(nn.Module):
     def __init__(self, num_features=9, hidden_dim=64):
-        super(Discriminator, self).__init__()
+        super(StatisticalDiscriminator, self).__init__()
         # 带批归一化的MLP，以应对不同特征的尺度问题
         self.mlp = nn.Sequential(
             nn.Linear(num_features, hidden_dim),
