@@ -12,7 +12,7 @@ from models.DirDisc import Discriminator, FisherDiscriminator
 
 class MaodieVQ(nn.Module):
     def __init__(self, h_dim, res_h_dim, n_res_layers,
-                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False, use_fisher=False, use_wgangp=False, lambda_gp=10.0, cosine=False):
+                 n_embeddings, embedding_dim, beta, dirichlet_alpha=0.1, temperature=1.0, patch_size=4, save_img_embedding_map=False, use_fisher=False, use_wgangp=False, lambda_gp=10.0, cosine=False, detach_z_e=False):
         super(MaodieVQ, self).__init__()
         # encode image into continuous latent space
         self.encoder = Encoder(3, h_dim, n_res_layers, res_h_dim)
@@ -20,7 +20,7 @@ class MaodieVQ(nn.Module):
             h_dim, embedding_dim, kernel_size=1, stride=1)
         # pass continuous latent vector through discretization bottleneck
         self.vq = VectorQuantizer(
-            n_embeddings, embedding_dim, beta, cosine=cosine)
+            n_embeddings, embedding_dim, beta, cosine=cosine, detach_z_e=detach_z_e)
         # decode the discrete latent representation
         self.decoder = Decoder(embedding_dim, h_dim, n_res_layers, res_h_dim)
 

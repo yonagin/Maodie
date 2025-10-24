@@ -1,5 +1,3 @@
-%cd maodie
-
 import os
 import torch
 import torch.nn as nn
@@ -253,6 +251,7 @@ def create_model():
     print(f"Temperature parameter: {temperature}")
     print(f"Dirichlet parameter: {dirichlet_alpha}")
     print(f"Use cosine similarity: {cosine}")
+    print(f"Detach z_e in distance calculation: {detach_z_e}")
     
     model = MaodieVQ(
         h_dim=h_dim,
@@ -265,7 +264,8 @@ def create_model():
         temperature=temperature,
         patch_size=patch_size,
         use_fisher=fisher,
-        cosine=cosine
+        cosine=cosine,
+        detach_z_e=detach_z_e
     ).to(device)
     
     return model
@@ -286,6 +286,7 @@ if __name__ == "__main__":
     patch_size = 4
     fisher = False
     cosine = False  # 是否使用余弦相似度计算距离
+    detach_z_e = False  # 是否在计算距离时detach z_e
 
     # Model parameters
     h_dim = 32
