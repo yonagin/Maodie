@@ -199,7 +199,7 @@ class MaodieVQ(nn.Module):
     
         # Update generator
         self.discriminator.requires_grad_(False)
-        D_fake = self.discriminator(p_fake)
+        D_fake = self.discriminator(transformed_p_fake)
 
         if self.use_fisher or self.use_wgangp:
             loss_adv = -torch.mean(D_fake)
