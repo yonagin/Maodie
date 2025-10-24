@@ -15,8 +15,16 @@ class Discriminator(torch.nn.Module):
         )
         
     def forward(self, p):
-        """p: (B, K) 概率向量"""
-        return self.net(p).squeeze(-1)
+        """p: (B, K) 来自单纯形空间的一批概率向量"""
+        
+        # --- 中心对数比 (CLR) 变换 ---
+        # 这个变换将概率向量 p 从单纯形空间映射到欧几里得空间。
+        # 为了数值稳定性，加入一个很小的 epsilon 以避免 log(0) 的情况。
+        log_p = torch.log(p + 1e-8)
+        transformed_p = log_p - torch.mean(log_p, dim=-1, keepdim=True)
+        
+        # 经过变换后的向量现在适合输入到标准的神经网络层中。
+        return self.net(transformed_p).squeeze(-1)
 
 class FisherDiscriminator(torch.nn.Module):
     def __init__(self, num_embeddings):
