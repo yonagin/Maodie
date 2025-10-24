@@ -155,16 +155,8 @@ class MaodieVQ(nn.Module):
         # 生成真实样本（先验）
         p_real = self.sample_dirichlet_prior(p_fake.size(0))
         p_real = p_real.to(p_fake.dtype)
-        # --- 中心对数比 (CLR) 变换 ---
-        # 这个变换将概率向量 p 从单纯形空间映射到欧几里得空间。
-        # 为了数值稳定性，加入一个很小的 epsilon 以避免 log(0) 的情况。
-        log_p_real = torch.log(p_real + 1e-8)
-        transformed_p_real = log_p_real - torch.mean(log_p_real, dim=-1, keepdim=True)
-        log_p_fake = torch.log(p_fake + 1e-8)
-        transformed_p_fake = log_p_fake - torch.mean(log_p_fake, dim=-1, keepdim=True)
-        
-        D_real = self.discriminator(transformed_p_real)
-        D_fake = self.discriminator(transformed_p_fake.detach())
+        D_real = self.discriminator(p_real)
+        D_fake = self.discriminator(p_fake.detach())
         
         if self.use_fisher:
             # 二阶矩约束项 Omega(f) = 0.5 * E[f(real)^2] + 0.5 * E[f(fake)^2]
@@ -184,7 +176,7 @@ class MaodieVQ(nn.Module):
             loss_D = torch.mean(D_fake) - torch.mean(D_real)
             
             # 计算梯度惩罚项
-            gradient_penalty = self.compute_gradient_penalty(transformed_p_real, transformed_p_fake.detach())
+            gradient_penalty = self.compute_gradient_penalty(p_real, p_fake.detach())
             loss_D = loss_D + self.lambda_gp * gradient_penalty
 
         else:
@@ -199,7 +191,7 @@ class MaodieVQ(nn.Module):
     
         # Update generator
         self.discriminator.requires_grad_(False)
-        D_fake = self.discriminator(transformed_p_fake)
+        D_fake = self.discriminator(p_fake)
 
         if self.use_fisher or self.use_wgangp:
             loss_adv = -torch.mean(D_fake)
