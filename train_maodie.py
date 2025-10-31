@@ -1,5 +1,3 @@
-%cd maodie
-
 import os
 import torch
 import torch.nn as nn
@@ -274,7 +272,7 @@ def create_model():
 if __name__ == "__main__":
     # Training parameters
     batch_size = 128
-    total_training_steps = 50000
+    total_training_steps = 20000
     eval_interval = 1000
     lr = 2e-4
     n_embeddings = 8192

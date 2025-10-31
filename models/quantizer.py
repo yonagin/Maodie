@@ -37,9 +37,9 @@ class VectorQuantizer(nn.Module):
             distances = 1.0 - cosine_sim
         else:
             # 原有的欧几里得距离计算
-            distances = (torch.sum(flat_z_e**2, dim=1, keepdim=True)
+            distances = (torch.sum(flat_z_e.detach()**2, dim=1, keepdim=True)
                         + torch.sum(self.embedding.weight**2, dim=1)
-                        - 2 * torch.einsum('bd,dn->bn', flat_z_e, self.embedding.weight.t()))
+                        - 2 * torch.einsum('bd,dn->bn', flat_z_e.detach(), self.embedding.weight.t()))
         
         # 硬量化
         encoding_indices = torch.argmin(distances, dim=1)
